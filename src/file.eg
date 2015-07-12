@@ -1,0 +1,112 @@
+
+require:
+   spacecore2 ->
+      identify
+      tuck, fork-identify
+      ID, CACHE, DIRECTORY
+      methods, fields
+      setup-proxy, deprox, proxy
+      object-clobber-helper
+   path
+   fs
+   chokidar
+
+provide:
+   File
+   VirtualFile
+
+
+
+class VirtualFile:
+   constructor{@contents} =
+      pass
+   stat{} =
+      null
+   read{} =
+      @contents
+
+
+class File:
+   type = .file
+   constructor{@path} =
+      pass
+   stat{} =
+      fs.lstat-sync{@path}
+   read{encoding = .utf8} =
+      fs.read-file-sync{@path, encoding}
+
+   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
+      FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
+
+   [^methods.iterate-properties]{} = {}
+   [^methods.iterate-properties2]{} = {}
+
+   [^methods.fork]{dir} =
+      rval = Object.create{File.prototype}
+      rval.path = @path
+      ;; {ID, CACHE} each field ->
+      ;;    tuck{rval, field, @[field]}
+      ;; fork-identify{rval}
+      ;; dir.enter{rval, false}
+      rval
+
+   [^methods.patch]{patch, dir} =
+      pass
+
+   [^methods.clobber]{new-dict, dir} =
+      throw E.no-clobber{"Cannot clobber a File object."}
+
+   [^methods.changed-relevantly]{reads, writes} =
+      writes["@read"] and reads["@read"]
+
+   [^methods.changed-relevantly2]{reads, writes} =
+      writes["@read"] and reads["@read"]??.n-tracks
+
+   gen [^methods.relevant-changes]{reads, writes} =
+      if writes["@read"] and reads["@read"]:
+         yield reads["@read"]
+
+   [^methods.enter]{dir} =
+      s = dir[fields.associated-state]
+      prox = s.model{@}
+      @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
+         {match event, p >> path.relative{@path, p}} ->
+            .add ->
+               pass
+            .change ->
+               s.transact with -> prox.touch{}
+            .unlink ->
+               pass
+            else ->
+               print 'Untracked event: file::{event}'
+
+   [^methods.exit]{dir} =
+      if @_watcher:
+         @_watcher.unwatch{@path}
+
+
+class FileProxy:
+   type = .file
+
+   constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
+      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
+
+   read{} =
+      @[methods.check-dirty-read]{"@read"}
+      @[methods.register-tracks]{"@read", -> true}
+      proxy{@[fields.obj].read{}
+            @[fields.tracks]
+            @[fields.patch]
+            @[fields.prevent-dirty-reads]}
+
+   stat{} =
+      @[methods.check-dirty-read]{"@read"}
+      @[methods.register-tracks]{"@read", -> true}
+      proxy{@[fields.obj].stat{}
+            @[fields.tracks]
+            @[fields.patch]
+            @[fields.prevent-dirty-reads]}
+
+   touch{} =
+      @[methods.register-patch]{"@read", -> true}
+

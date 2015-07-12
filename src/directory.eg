@@ -1,0 +1,208 @@
+
+require:
+   spacecore2 ->
+      tuck, fork-identify
+      ID, CACHE, DIRECTORY
+      methods, fields
+      setup-proxy, deprox, proxy
+      object-clobber-helper
+   path
+   fs
+   .file ->
+      File
+   chokidar
+   minimatch
+
+provide:
+   Directory
+
+class Directory:
+
+   type = .directory
+
+   constructor{@path} =
+      @data = Object.create{null}
+      fs.readdir-sync{@path} each filename ->
+         stat = fs.lstat-sync with path.join{@path, filename}
+         @data[filename] =
+            if stat.is-directory{}:
+               .directory
+            elif stat.is-file{}:
+               .file
+            else:
+               .unsupported
+
+   gen find{glob} =
+      match glob.split{"/"}:
+         {} ->
+            yield [@]
+         {"**", *rest} ->
+            yield all @find{rest.join{"/"}}
+            [@] each entry when entry.find ->
+               yield all entry.find{glob}
+         {minimatch.make-re! x, *rest} ->
+            @keys{} each
+               x? name ->
+                  entry = @get{name}
+                  if rest == {}:
+                     yield entry
+                  elif entry.type === "directory":
+                     yield all entry.find{rest.join{"/"}}
+               else ->
+                  continue
+
+   get{key} =
+      full-path = path.join{@path, key}
+      match @data[key]:
+         .file ->
+            expr-value @data[key] =
+               match @[DIRECTORY]:
+                  undefined? -> File{full-path}
+                  dir -> dir.acquire{File{full-path}}
+         .directory ->
+            expr-value @data[key] =
+               match @[DIRECTORY]:
+                  undefined? -> Directory{full-path}
+                  dir -> dir.acquire{Directory{full-path}}
+         .unsupported ->
+            throw E.unsupported-file{full-path}
+         undefined? ->
+            throw E.not-found{}
+         x ->
+            x
+
+   set{String? key or Number? key, value} =
+      @data[key] = value
+
+   .delete{key} =
+      delete @data[key]
+
+   .keys{} =
+      keys{@data}
+
+   entries{} =
+      keys{@data} each k -> {k, @get{k}}
+
+   gen [^Symbol.iterator]{} =
+      keys{@data} each k -> yield @get{k}
+
+   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
+      DirectoryProxy{@path, @, tracks, patch, prevent-dirty-reads}
+
+   [^methods.iterate-properties]{} =
+      Object.prototype[methods.iterate-properties].call{@data, @}
+
+   [^methods.iterate-properties2]{} =
+      Object.prototype[methods.iterate-properties2].call{@data, @}
+
+   ;; [^methods.fork]{dir} =
+   ;;    ;; throw E.no-fork{"Cannot fork a Directory object."}
+   ;;    rval = Object.create{Directory.prototype}
+   ;;    rval.path = @path
+   ;;    rval.data = {=}
+   ;;    {ID, CACHE} each field ->
+   ;;       tuck{rval, field, @[field]}
+   ;;    fork-identify{rval}
+   ;;    dir.enter{rval, false}
+   ;;    items{@data} each {key, value} ->
+   ;;       rval.data[key] = dir.acquire{value}
+   ;;    rval
+
+   [^methods.fork]{} =
+      rval = Object.create{Directory.prototype}
+      rval.path = @path
+      rval.data = {=}
+      items{@data} each {key, value} ->
+         rval.data[key] = value
+      rval
+
+   [^methods.patch]{patch, dir} =
+      Object.prototype[methods.patch].call{@data, patch, dir, @}
+
+   [^methods.clobber]{new-dict, dir} =
+      throw E.no-clobber{"Cannot clobber a Directory object."}
+
+   [^methods.changed-relevantly]{reads, writes} =
+      items{writes or {=}} each
+         {name, _} when reads[name] ->
+            return true
+         when reads["@iter"] ->
+            return true
+      false
+
+   [^methods.changed-relevantly2]{reads, writes} =
+      items{writes or {=}} each
+         {name, _} when reads[name]??.n-tracks ->
+            return true
+         when reads["@iter"]??.n-tracks ->
+            return true
+      false
+
+   gen [^methods.relevant-changes]{reads, writes} =
+      items{writes or {=}} each
+         {name, _} when reads[name] ->
+            yield reads[name]
+         when reads["@iter"] ->
+            yield reads["@iter"]
+
+
+   [^methods.enter]{dir} =
+      s = dir[fields.associated-state]
+      prox = s.model{@}
+      @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
+         {match event, p >> path.relative{@path, p}} ->
+            .add ->
+               s.transact with -> prox.set{p, "file"}
+            .add-dir ->
+               s.transact with -> prox.set{p, "directory"}
+            .unlink ->
+               s.transact with -> prox.delete{p}
+            .change ->
+               pass
+            else ->
+               print 'Untracked event: dir::{event}'
+
+   [^methods.exit]{dir} =
+      if @_watcher:
+         @_watcher.unwatch{@path}
+
+
+
+class DirectoryProxy:
+   type = .directory
+
+   constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
+      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
+
+   gen find{glob} =
+      yield all @[fields.obj].find.call{@, glob}
+
+   get{key} =
+      @[methods.check-dirty-read]{key}
+      @[methods.register-tracks]{key, -> true}
+      proxy{@[fields.obj].get{key}
+            @[fields.tracks]
+            @[fields.patch]
+            @[fields.prevent-dirty-reads]}
+
+   set{key, value} =
+      @[methods.register-patch]{key, -> #update{deprox{value}}}
+
+   .delete{key} =
+      @[methods.register-patch]{key, -> #delete{}}
+
+   gen [^Symbol.iterator]{} =
+      @entries{} each {_, v} -> yield v
+
+   keys{} =
+      @[methods.register-tracks]{"@iter", -> true}
+      @[fields.obj].keys{}
+
+   entries{} =
+      @[methods.register-tracks]{"@iter", -> true}
+      @[fields.obj].entries{} each {k, v} ->
+         {k, proxy{v
+                   @[fields.tracks]
+                   @[fields.patch]
+                   @[fields.prevent-dirty-reads]}}
+
