@@ -1,0 +1,31 @@
+{
+  "name": "engage",
+  "description": "Incremental task runner",
+  "version": "0.0.0",
+  "format": "cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/breuleux/engage"
+  },
+  "keywords": [],
+  "author": "Olivier Breuleux",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "dependencies": {
+    "chokidar": "^1.0.3",
+    "earlgrey-runtime": ">=0.0.9",
+    "minimatch": "^2.0.8",
+    "spacecore": ">=0.0.0"
+  },
+  "devDependencies": {
+    "earlgrey": ">=0.0.7",
+    "mocha": "^2.2.1",
+    "earl-mocha": ">=0.0.2"
+  },
+  "scripts": {
+    "refresh": "earl compile -5vso lib/ src/",
+    "compile": "earl compile -5rvso lib/ src/",
+    "prepublish": "npm run compile",
+    "test": "mocha"
+  }
+}
