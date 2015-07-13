@@ -1,0 +1,14 @@
+
+require:
+   path
+
+provide:
+   rebaser, rebase
+
+
+rebaser{src, dest}{{path => p} or p} =
+   path.join{dest, path.relative{src, p}}
+
+rebase{src, dest, p} =
+   rebaser{src, dest}{p}
+
