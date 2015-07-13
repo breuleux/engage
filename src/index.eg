@@ -1,0 +1,38 @@
+
+require:
+   spacecore2/lib/task ->
+      task-function, State, DependentState
+   .directory ->
+      Directory
+   .file ->
+      File
+   .output ->
+      Write, Delete, commit-all
+   .util ->
+      rebaser
+   path
+
+provide:
+   task-function
+   Directory, File
+   rebaser
+   Write, Delete, commit-all
+   Engage
+
+
+default-options = {
+   log = console.log
+}
+
+class Engage:
+   constructor{@main-task, @root, @options = {=}} =
+      @options = default-options & @options
+      if String? @root:
+         @root = Directory{@root}
+   run{} =
+      @state = State{@root}
+      @dstate = DependentState{@state, @main-task, clobber-patch = false}
+      @act{}
+      @dstate.add-listener{-> @act{}}
+   act{} =
+      commit-all{@dstate.get{}, @options}
