@@ -1,0 +1,48 @@
+
+require:
+   fs
+   mkdirp
+
+provide:
+   Write
+   Delete
+   commit-all
+
+
+class Write:
+   constructor{@path, @contents, @options = {=}} =
+      @written = null
+   write{options = {=}} =
+      o = @options & options
+      if o.log:
+         o.log{.write, @path}
+      base = @path.split{"/"}[... -1].join{"/"}
+      if base !== "":
+         mkdirp.sync{base}
+      fs.write-file-sync{@path, @contents, o}
+      @written = new Date{}
+   commit{options = {=}} =
+      if not @written:
+         @write{options}
+
+class Delete:
+   constructor{@path, @contents, @options = {=}} =
+      @done = false
+   .delete{options = {=}} =
+      o = @options & options
+      if o.log:
+         o.log{.delete, @path}
+      fs.unlink-sync{@path}
+      @done = true
+   commit{options = {=}} =
+      if not @done:
+         @delete{options}
+
+
+commit-all{instructions each match instruction, options = {=}} =
+   Array? ->
+      commit-all{instruction, options}
+   else ->
+      instruction.commit{options}
+
+
