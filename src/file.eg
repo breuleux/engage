@@ -42,13 +42,7 @@ class File:
    [^methods.iterate-properties2]{} = {}
 
    [^methods.fork]{dir} =
-      rval = Object.create{File.prototype}
-      rval.path = @path
-      ;; {ID, CACHE} each field ->
-      ;;    tuck{rval, field, @[field]}
-      ;; fork-identify{rval}
-      ;; dir.enter{rval, false}
-      rval
+      File{@path}
 
    [^methods.patch]{patch, dir} =
       pass
@@ -85,7 +79,7 @@ class File:
          @_watcher.unwatch{@path}
 
 
-class FileProxy:
+class FileProxy < File:
    type = .file
 
    constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =

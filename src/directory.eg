@@ -95,19 +95,6 @@ class Directory:
    [^methods.iterate-properties2]{} =
       Object.prototype[methods.iterate-properties2].call{@data, @}
 
-   ;; [^methods.fork]{dir} =
-   ;;    ;; throw E.no-fork{"Cannot fork a Directory object."}
-   ;;    rval = Object.create{Directory.prototype}
-   ;;    rval.path = @path
-   ;;    rval.data = {=}
-   ;;    {ID, CACHE} each field ->
-   ;;       tuck{rval, field, @[field]}
-   ;;    fork-identify{rval}
-   ;;    dir.enter{rval, false}
-   ;;    items{@data} each {key, value} ->
-   ;;       rval.data[key] = dir.acquire{value}
-   ;;    rval
-
    [^methods.fork]{} =
       rval = Object.create{Directory.prototype}
       rval.path = @path
@@ -168,14 +155,11 @@ class Directory:
 
 
 
-class DirectoryProxy:
+class DirectoryProxy < Directory:
    type = .directory
 
    constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
       setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
-
-   gen find{glob} =
-      yield all @[fields.obj].find.call{@, glob}
 
    get{key} =
       @[methods.check-dirty-read]{key}
