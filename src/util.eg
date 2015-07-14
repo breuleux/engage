@@ -3,12 +3,27 @@ require:
    path
 
 provide:
-   rebaser, rebase
+   rename, Renamer
 
 
-rebaser{src, dest}{{path => p} or p} =
-   path.join{dest, path.relative{src, p}}
+rename{var {path => p} or p, opts = {=}} =
+   rebase = opts.rebase or [opts.from and {opts.from => opts.to or ""}] or {=}
+   items{rebase} each {from, to} ->
+      rel = path.relative{from, p}
+      if not rel.starts-with{"../"}:
+         p = path.join{to, rel}
+         break
+   if opts.extension:
+      p = p.replace{R"\.[a-zA-Z0-9]+$", opts.extension}
+   p
 
-rebase{src, dest, p} =
-   rebaser{src, dest}{p}
+class _Renamer:
+   constructor{@options = {=}} =
+      pass
+   .rename{p, options = {=}} =
+      rename{p, @options & options}
+
+Renamer{options} =
+   r = _Renamer{options}
+   r.rename.bind{r}
 
