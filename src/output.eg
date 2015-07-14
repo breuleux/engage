@@ -39,10 +39,11 @@ class Delete:
          @delete{options}
 
 
-commit-all{instructions each match instruction, options = {=}} =
-   Array? ->
-      commit-all{instruction, options}
-   else ->
+commit-all{match, options = {=}} =
+   Array? instructions ->
+      instructions each x ->
+         commit-all{x, options}
+   instruction ->
       instruction.commit{options}
 
 
