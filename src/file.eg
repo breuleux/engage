@@ -1,12 +1,8 @@
 
 require:
    spacecore2 ->
-      identify
-      tuck, fork-identify
-      ID, CACHE, DIRECTORY
-      methods, fields
+      ID, methods, fields
       setup-proxy, deprox, proxy
-      object-clobber-helper
    path
    fs
    chokidar
@@ -39,7 +35,6 @@ class File:
       FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
 
    [^methods.iterate-properties]{} = {}
-   [^methods.iterate-properties2]{} = {}
 
    [^methods.fork]{dir} =
       File{@path}
@@ -49,12 +44,6 @@ class File:
 
    [^methods.clobber]{new-dict, dir} =
       throw E.no-clobber{"Cannot clobber a File object."}
-
-   [^methods.changed-relevantly]{reads, writes} =
-      writes["@read"] and reads["@read"]
-
-   [^methods.changed-relevantly2]{reads, writes} =
-      writes["@read"] and reads["@read"]??.n-tracks
 
    gen [^methods.relevant-changes]{reads, writes} =
       if writes["@read"] and reads["@read"]:

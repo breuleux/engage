@@ -1,7 +1,7 @@
 
 require:
-   spacecore2/lib/task ->
-      task-function, State, DependentState
+   spacecore2 ->
+      cached-function, State, DependentState
    .directory ->
       Directory
    .file ->
@@ -9,13 +9,13 @@ require:
    .output ->
       Write, Delete, commit-all
    .util ->
-      rebaser
+      rename, Renamer
    path
 
 provide:
-   task-function
+   cached-function
    Directory, File
-   rebaser
+   rename, Renamer
    Write, Delete, commit-all
    Engage
 

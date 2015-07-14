@@ -1,11 +1,9 @@
 
 require:
    spacecore2 ->
-      tuck, fork-identify
-      ID, CACHE, DIRECTORY
+      ID, DIRECTORY
       methods, fields
       setup-proxy, deprox, proxy
-      object-clobber-helper
    path
    fs
    .file ->
@@ -92,9 +90,6 @@ class Directory:
    [^methods.iterate-properties]{} =
       Object.prototype[methods.iterate-properties].call{@data, @}
 
-   [^methods.iterate-properties2]{} =
-      Object.prototype[methods.iterate-properties2].call{@data, @}
-
    [^methods.fork]{} =
       rval = Object.create{Directory.prototype}
       rval.path = @path
@@ -108,22 +103,6 @@ class Directory:
 
    [^methods.clobber]{new-dict, dir} =
       throw E.no-clobber{"Cannot clobber a Directory object."}
-
-   [^methods.changed-relevantly]{reads, writes} =
-      items{writes or {=}} each
-         {name, _} when reads[name] ->
-            return true
-         when reads["@iter"] ->
-            return true
-      false
-
-   [^methods.changed-relevantly2]{reads, writes} =
-      items{writes or {=}} each
-         {name, _} when reads[name]??.n-tracks ->
-            return true
-         when reads["@iter"]??.n-tracks ->
-            return true
-      false
 
    gen [^methods.relevant-changes]{reads, writes} =
       items{writes or {=}} each
