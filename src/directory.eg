@@ -105,12 +105,19 @@ class Directory:
       throw E.no-clobber{"Cannot clobber a Directory object."}
 
    gen [^methods.relevant-changes]{reads, writes} =
-      items{writes or {=}} each
-         {name, _} when reads[name] ->
+      items{reads or {=}} each {match name, entry} ->
+         R"^@:(.*)"! {_, minimatch.make-re! x} ->
+            items{writes or {=}} each {wname, _} when x? wname ->
+               yield entry
+         else ->
+            pass
+      items{writes or {=}} each match {name, cmd} ->
+         when reads[name] ->
             yield reads[name]
+         when cmd.type === .directory and reads["@directories"] ->
+            yield reads["@directories"]
          when reads["@iter"] ->
             yield reads["@iter"]
-
 
    [^methods.enter]{dir} =
       s = dir[fields.associated-state]
@@ -122,6 +129,10 @@ class Directory:
             .add-dir ->
                s.transact with -> prox.set{p, "directory"}
             .unlink ->
+               s.transact with -> prox.delete{p}
+            .unlink-dir when p === "" ->
+               @_watcher.unwatch{@path}
+            .unlink-dir ->
                s.transact with -> prox.delete{p}
             .change ->
                pass
@@ -140,19 +151,42 @@ class DirectoryProxy < Directory:
    constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
       setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
 
+   _prox{x} =
+      proxy{x, @[fields.tracks], @[fields.patch], @[fields.prevent-dirty-reads]}
+
+   gen find{glob} =
+      match glob.split{"/"}:
+         {} ->
+            yield [@]
+         {"**", *rest} ->
+            yield all @find{rest.join{"/"}}
+            @[methods.register-tracks]{"@directories", -> true}
+            [@[fields.obj]] each entry when entry.find ->
+               yield all @_prox{entry}.find{glob}
+         {orig and minimatch.make-re! x, *rest} ->
+            @[methods.register-tracks]{'@:{orig}', -> true}
+            @[fields.obj].keys{} each
+               x? name ->
+                  entry = @get{name}
+                  if rest == {}:
+                     yield entry
+                  elif entry.type === "directory":
+                     yield all entry.find{rest.join{"/"}}
+               else ->
+                  continue
+
    get{key} =
       @[methods.check-dirty-read]{key}
       @[methods.register-tracks]{key, -> true}
-      proxy{@[fields.obj].get{key}
-            @[fields.tracks]
-            @[fields.patch]
-            @[fields.prevent-dirty-reads]}
+      @_prox{@[fields.obj].get{key}}
 
    set{key, value} =
-      @[methods.register-patch]{key, -> #update{deprox{value}}}
+      @[methods.register-patch]{key, -> #update{deprox{value}} &: {type = value}}
 
    .delete{key} =
-      @[methods.register-patch]{key, -> #delete{}}
+      data = @[fields.obj].data[key]
+      type = if{String? data, data, data.type}
+      @[methods.register-patch]{key, -> #delete{} &: {type = type}}
 
    gen [^Symbol.iterator]{} =
       @entries{} each {_, v} -> yield v
