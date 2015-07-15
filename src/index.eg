@@ -27,7 +27,7 @@ class Engage:
       @options.log or= console.log
       @options.rename or= Renamer{@options}
    run{} =
-      @state = State{FileSystem{@options}}
+      @state = State{FileSystem{@options}, input-self = true}
       @dstate = DependentState{@state, @main-task, clobber-patch = false}
       @act{}
       @dstate.add-listener{-> @act{}}

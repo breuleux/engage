@@ -91,6 +91,7 @@ class FileSystem:
 class FileSystemProxy < FileSystem:
 
    constructor{obj, tracks, patch, prevent-dirty-reads = true} =
+      [@] &: obj.options
       setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
 
    _prox{x} =
