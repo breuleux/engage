@@ -3,23 +3,14 @@ require:
    spacecore2 ->
       ID, methods, fields
       setup-proxy, deprox, proxy
+   .output ->
+      read-from
    path
    fs
    chokidar
 
 provide:
    File
-   VirtualFile
-
-
-
-class VirtualFile:
-   constructor{@contents} =
-      pass
-   stat{} =
-      null
-   read{} =
-      @contents
 
 
 class File:
@@ -28,8 +19,9 @@ class File:
       pass
    stat{} =
       fs.lstat-sync{@path}
-   read{encoding = .utf8} =
-      fs.read-file-sync{@path, encoding}
+   read{} =
+      read-from[@path] = true
+      fs.read-file-sync{@path}
 
    [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
       FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
@@ -59,13 +51,21 @@ class File:
             .change ->
                s.transact with -> prox.touch{}
             .unlink ->
-               pass
+               @_watcher.unwatch{@path}
             else ->
                print 'Untracked event: file::{event}'
 
    [^methods.exit]{dir} =
       if @_watcher:
          @_watcher.unwatch{@path}
+
+Object.define-property{File.prototype, .contents} with {
+   method get{} = @read{}
+}
+
+Object.define-property{File.prototype, .text} with {
+   method get{} = @read{}.to-string{}
+}
 
 
 class FileProxy < File:
@@ -77,10 +77,7 @@ class FileProxy < File:
    read{} =
       @[methods.check-dirty-read]{"@read"}
       @[methods.register-tracks]{"@read", -> true}
-      proxy{@[fields.obj].read{}
-            @[fields.tracks]
-            @[fields.patch]
-            @[fields.prevent-dirty-reads]}
+      @[fields.obj].read{}
 
    stat{} =
       @[methods.check-dirty-read]{"@read"}
