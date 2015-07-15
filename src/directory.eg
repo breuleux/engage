@@ -8,11 +8,92 @@ require:
    fs
    .file ->
       File
+   .util ->
+      Renamer
    chokidar
    minimatch
 
 provide:
    Directory
+   FileSystem
+
+
+
+analyze-path{p >> p.split{"/"}} =
+   var i = 0
+   if p.length > 1 and p[0] === "":
+      p[0] = "/"
+   p[.. -1] each part ->
+      if R"*"? part: break
+      i += 1
+   {base = p.slice{0, i}
+    rest = p.slice{i}}
+
+
+class FileSystem:
+
+   constructor{@options} =
+      [@] &: @options
+      @directory-cache = {=}
+
+   get{p} =
+      match @directory-cache[p]:
+         undefined? ->
+            stat = fs.lstat-sync{p}
+            entry =
+               if stat.is-directory{}:
+                  Directory{p}
+               else:
+                  File{p}
+            expr-value @directory-cache[p] =
+               match @[DIRECTORY]:
+                  undefined? ->
+                     entry
+                  dir ->
+                     dir.acquire{entry}
+         existing ->
+            existing
+
+   ;; get{p} =
+   ;;    match p.split{"/"}:
+   ;;       {""} ->
+   ;;          @directory-cache.cwd
+   ;;       {"", *rest} ->
+   ;;          @directory-cache.root.get{rest.join{"/"}}
+   ;;       {".", *parts} or parts ->
+   ;;          @directory-cache.cwd.get{parts.join{"/"}}
+
+   ;; gen find{glob} =
+   ;;    match glob.split{"/"}:
+   ;;       {""} ->
+   ;;          yield @directory-cache.cwd
+   ;;       {"", *rest} ->
+   ;;          yield all @directory-cache.root.find{rest.join{"/"}}
+   ;;       {".", *parts} or parts ->
+   ;;          yield all @directory-cache.cwd.find{parts.join{"/"}}
+
+   gen find{glob} =
+      {=> base, => rest} = analyze-path{glob}
+      @get{base}.find{rest.join{"/"}}
+
+   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
+      FileSystemProxy{@, tracks, patch, prevent-dirty-reads}
+
+
+class FileSystemProxy < FileSystem:
+
+   constructor{obj, tracks, patch, prevent-dirty-reads = true} =
+      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
+
+   _prox{x} =
+      proxy{x, @[fields.tracks], @[fields.patch], @[fields.prevent-dirty-reads]}
+
+   get{key} =
+      @[methods.check-dirty-read]{key}
+      @[methods.register-tracks]{key, -> true}
+      @_prox{@[fields.obj].get{key}}
+      
+
 
 class Directory:
 
@@ -32,7 +113,7 @@ class Directory:
 
    gen find{glob} =
       match glob.split{"/"}:
-         {} ->
+         {""} ->
             yield [@]
          {"**", *rest} ->
             yield all @find{rest.join{"/"}}
@@ -50,24 +131,28 @@ class Directory:
                   continue
 
    get{key} =
-      full-path = path.join{@path, key}
-      match @data[key]:
-         .file ->
-            expr-value @data[key] =
-               match @[DIRECTORY]:
-                  undefined? -> File{full-path}
-                  dir -> dir.acquire{File{full-path}}
-         .directory ->
-            expr-value @data[key] =
-               match @[DIRECTORY]:
-                  undefined? -> Directory{full-path}
-                  dir -> dir.acquire{Directory{full-path}}
-         .unsupported ->
-            throw E.unsupported-file{full-path}
-         undefined? ->
-            throw E.not-found{}
-         x ->
-            x
+      match key.split{"/"}:
+         {file} ->
+            full-path = path.join{@path, key}
+            match @data[key]:
+               .file ->
+                  expr-value @data[key] =
+                     match @[DIRECTORY]:
+                        undefined? -> File{full-path}
+                        dir -> dir.acquire{File{full-path}}
+               .directory ->
+                  expr-value @data[key] =
+                     match @[DIRECTORY]:
+                        undefined? -> Directory{full-path}
+                        dir -> dir.acquire{Directory{full-path}}
+               .unsupported ->
+                  throw E.unsupported-file{full-path}
+               undefined? ->
+                  throw E.not-found{'{@path}/{key}'}
+               x ->
+                  x
+         {base, *rest} ->
+            @get{base}.get{rest.join{"/"}}
 
    set{String? key or Number? key, value} =
       @data[key] = value
@@ -156,7 +241,7 @@ class DirectoryProxy < Directory:
 
    gen find{glob} =
       match glob.split{"/"}:
-         {} ->
+         {""} ->
             yield [@]
          {"**", *rest} ->
             yield all @find{rest.join{"/"}}

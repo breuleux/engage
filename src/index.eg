@@ -3,7 +3,7 @@ require:
    spacecore2 ->
       cached-function, State, DependentState
    .directory ->
-      Directory
+      Directory, FileSystem
    .file ->
       File
    .output ->
@@ -22,17 +22,12 @@ provide:
    Engage
 
 
-default-options = {
-   log = console.log
-}
-
 class Engage:
-   constructor{@main-task, @root, @options = {=}} =
-      @options = default-options & @options
-      if String? @root:
-         @root = Directory{@root}
+   constructor{@main-task, @options = {=}} =
+      @options.log or= console.log
+      @options.rename or= Renamer{@options}
    run{} =
-      @state = State{@root}
+      @state = State{FileSystem{@options}}
       @dstate = DependentState{@state, @main-task, clobber-patch = false}
       @act{}
       @dstate.add-listener{-> @act{}}
