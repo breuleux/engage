@@ -10,10 +10,12 @@ require:
       Write, Delete, commit-all
    .util ->
       rename, Renamer
+      task-function
    path
 
 provide:
    cached-function
+   task-function
    Directory, File
    rename, Renamer
    Write, Delete, commit-all
