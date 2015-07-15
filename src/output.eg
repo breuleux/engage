@@ -2,18 +2,41 @@
 require:
    fs
    mkdirp
+   path
 
 provide:
    Write
    Delete
    commit-all
+   read-from
+   validate-output-path
 
+
+read-from = {=}
+
+validate-output-path{p, o = {=}} =
+   if not o.allow-overwrite and read-from[@path]:
+      throw E.overwrite with
+         'Will not overwrite file {@path} because it was read by the main task.'
+         \ + ' This stoppage can be overruled with option allow-overwrite = true.'
+   if o.output-white-list:
+      var okay = false
+      [Array! o.output-white-list] each rpath ->
+         if not path.relative{rpath, @path}.starts-with{".."}:
+            okay = true
+      if not okay:
+         throw E.not-white-listed{'Path {@path} is not white-listed for writing.'}
+   [Array! [o.read-only or {}]] each rpath ->
+      if not path.relative{rpath, @path}.starts-with{".."}:
+         throw E.read-only{'Path {rpath} is read-only, so {@path} cannot be written.'}
+   true
 
 class Write:
    constructor{@path, @contents, @options = {=}} =
       @written = null
    write{options = {=}} =
       o = @options & options
+      validate-output-path{@path, o}
       if o.log:
          o.log{.write, @path}
       base = @path.split{"/"}[... -1].join{"/"}
