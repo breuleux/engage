@@ -1,10 +1,17 @@
 
 require:
    path
+   spacecore2 ->
+      cached-function
 
 provide:
    rename, Renamer
+   task-function
 
+
+;;;;;;;;;;;;;
+;; RENAMER ;;
+;;;;;;;;;;;;;
 
 rename{var {path => p} or p, opts = {=}} =
    rebase = opts.rebase or [opts.from and {opts.from => opts.to or ""}] or {=}
@@ -26,4 +33,27 @@ class _Renamer:
 Renamer{options} =
    r = _Renamer{options}
    r.rename.bind{r}
+
+
+
+;;;;;;;;;;;;;;;;
+;; TASK CACHE ;;
+;;;;;;;;;;;;;;;;
+
+task-cache = {=}
+
+task-function{f, transform = null} =
+   m = [task-cache[f.to-string{}] or= new Map{}]
+   match m.get{transform}:
+      undefined? and match is transform ->
+         null? ->
+            c = cached-function{f}
+            m.set{transform, c}
+            c
+         else ->
+            c = cached-function with {*args} @-> f.apply{@, transform{args}}
+            m.set{transform, c}
+            c
+      task-f ->
+         task-f
 
