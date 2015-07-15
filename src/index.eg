@@ -3,7 +3,7 @@ require:
    spacecore2 ->
       cached-function, State, DependentState
    .directory ->
-      Directory, FileSystem
+      FileIterator, FileSystem, Directory
    .file ->
       File
    .output ->
@@ -16,7 +16,7 @@ require:
 provide:
    cached-function
    task-function
-   Directory, File
+   FileIterator, FileSystem, Directory, File
    rename, Renamer
    Write, Delete, commit-all
    Engage

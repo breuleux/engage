@@ -9,15 +9,42 @@ require:
    .file ->
       File
    .util ->
-      Renamer
+      Renamer, task-function
    chokidar
    minimatch
 
 provide:
-   Directory
+   FileIterator
    FileSystem
+   Directory
 
 
+
+
+extract-text-transformer{{match arg}} =
+   File? -> {arg.text, arg}
+   else -> {arg, arg}
+
+class FileIterator:
+   constructor{@gen} =
+      @results = null
+   gen [^Symbol.iterator]{} =
+      if @results:
+         @results each x -> yield x
+      else:
+         results = {}
+         @gen each x ->
+            results.push{x}
+            yield x
+         @results = results
+   map{fn} =
+      t = task-function{fn}
+      [@] each x -> t{x}
+   map-file{fn} =
+      t = task-function{fn, extract-text-transformer}
+      [@] each x -> t{x}
+   bundle{fn} =
+      throw E.todo{}
 
 analyze-path{p >> p.split{"/"}} =
    var i = 0
@@ -28,7 +55,6 @@ analyze-path{p >> p.split{"/"}} =
       i += 1
    {base = p.slice{0, i}
     rest = p.slice{i}}
-
 
 class FileSystem:
 
@@ -54,25 +80,7 @@ class FileSystem:
          existing ->
             existing
 
-   ;; get{p} =
-   ;;    match p.split{"/"}:
-   ;;       {""} ->
-   ;;          @directory-cache.cwd
-   ;;       {"", *rest} ->
-   ;;          @directory-cache.root.get{rest.join{"/"}}
-   ;;       {".", *parts} or parts ->
-   ;;          @directory-cache.cwd.get{parts.join{"/"}}
-
-   ;; gen find{glob} =
-   ;;    match glob.split{"/"}:
-   ;;       {""} ->
-   ;;          yield @directory-cache.cwd
-   ;;       {"", *rest} ->
-   ;;          yield all @directory-cache.root.find{rest.join{"/"}}
-   ;;       {".", *parts} or parts ->
-   ;;          yield all @directory-cache.cwd.find{parts.join{"/"}}
-
-   gen find{glob} =
+   find{glob} =
       {=> base, => rest} = analyze-path{glob}
       @get{base}.find{rest.join{"/"}}
 
@@ -111,24 +119,26 @@ class Directory:
             else:
                .unsupported
 
-   gen find{glob} =
-      match glob.split{"/"}:
-         {""} ->
-            yield [@]
-         {"**", *rest} ->
-            yield all @find{rest.join{"/"}}
-            [@] each entry when entry.find ->
-               yield all entry.find{glob}
-         {minimatch.make-re! x, *rest} ->
-            @keys{} each
-               x? name ->
-                  entry = @get{name}
-                  if rest == {}:
-                     yield entry
-                  elif entry.type === "directory":
-                     yield all entry.find{rest.join{"/"}}
-               else ->
-                  continue
+   find{glob} =
+      gen g{} =
+         match glob.split{"/"}:
+            {""} ->
+               yield [@]
+            {"**", *rest} ->
+               yield all @find{rest.join{"/"}}
+               [@] each entry when entry.find ->
+                  yield all entry.find{glob}
+            {minimatch.make-re! x, *rest} ->
+               @keys{} each
+                  x? name ->
+                     entry = @get{name}
+                     if rest == {}:
+                        yield entry
+                     elif entry.type === "directory":
+                        yield all entry.find{rest.join{"/"}}
+                  else ->
+                     continue
+      FileIterator{g{}}
 
    get{key} =
       match key.split{"/"}:
@@ -239,26 +249,28 @@ class DirectoryProxy < Directory:
    _prox{x} =
       proxy{x, @[fields.tracks], @[fields.patch], @[fields.prevent-dirty-reads]}
 
-   gen find{glob} =
-      match glob.split{"/"}:
-         {""} ->
-            yield [@]
-         {"**", *rest} ->
-            yield all @find{rest.join{"/"}}
-            @[methods.register-tracks]{"@directories", -> true}
-            [@[fields.obj]] each entry when entry.find ->
-               yield all @_prox{entry}.find{glob}
-         {orig and minimatch.make-re! x, *rest} ->
-            @[methods.register-tracks]{'@:{orig}', -> true}
-            @[fields.obj].keys{} each
-               x? name ->
-                  entry = @get{name}
-                  if rest == {}:
-                     yield entry
-                  elif entry.type === "directory":
-                     yield all entry.find{rest.join{"/"}}
-               else ->
-                  continue
+   find{glob} =
+      gen g{} =
+         match glob.split{"/"}:
+            {""} ->
+               yield [@]
+            {"**", *rest} ->
+               yield all @find{rest.join{"/"}}
+               @[methods.register-tracks]{"@directories", -> true}
+               [@[fields.obj]] each entry when entry.find ->
+                  yield all @_prox{entry}.find{glob}
+            {orig and minimatch.make-re! x, *rest} ->
+               @[methods.register-tracks]{'@:{orig}', -> true}
+               @[fields.obj].keys{} each
+                  x? name ->
+                     entry = @get{name}
+                     if rest == {}:
+                        yield entry
+                     elif entry.type === "directory":
+                        yield all entry.find{rest.join{"/"}}
+                  else ->
+                     continue
+      FileIterator{g{}}
 
    get{key} =
       @[methods.check-dirty-read]{key}
