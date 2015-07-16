@@ -51,7 +51,7 @@ task-function{f, transform = null} =
             m.set{transform, c}
             c
          else ->
-            c = cached-function with {*args} @-> f.apply{@, transform{args}}
+            c = cached-function{transform{f}}
             m.set{transform, c}
             c
       task-f ->

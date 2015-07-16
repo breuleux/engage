@@ -4,12 +4,15 @@ require:
       ID, DIRECTORY
       methods, fields
       setup-proxy, deprox, proxy
+      current-context
    path
    fs
    .file ->
       File
    .util ->
       Renamer, task-function
+   .output ->
+      Write
    chokidar
    minimatch
 
@@ -20,10 +23,19 @@ provide:
 
 
 
-
-extract-text-transformer{{match arg}} =
-   File? -> {arg.text, arg}
-   else -> {arg, arg}
+extract-text-transformer{f} =
+   method new-f{File? file, options} =
+      state = current-context{}??.state
+      if not state:
+         throw E.map-file{"Cannot find a renaming function to use."}
+      res = f.call{@, file.text, file}
+      match res:
+         Write? w -> w
+         String? s ->
+            Write{state.self{}.rename{file.path, options}, s}
+         other ->
+            other
+   new-f
 
 class FileIterator:
    constructor{@gen} =
@@ -40,9 +52,9 @@ class FileIterator:
    map{fn} =
       t = task-function{fn}
       [@] each x -> t{x}
-   map-file{fn} =
+   map-file{options = {=}, fn} =
       t = task-function{fn, extract-text-transformer}
-      [@] each x -> t{x}
+      [@] each file -> t{file, {=} & options}
    bundle{fn} =
       throw E.todo{}
 
