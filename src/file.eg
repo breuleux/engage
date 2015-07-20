@@ -1,6 +1,6 @@
 
 require:
-   spacecore2 ->
+   quasar ->
       ID, methods, fields
       setup-proxy, deprox, proxy
    .output ->
