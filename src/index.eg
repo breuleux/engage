@@ -1,7 +1,7 @@
 
 require:
    spacecore2 ->
-      cached-function, State, DependentState
+      cached-function, State, Function
    .directory ->
       FileIterator, FileSystem, Directory
    .file ->
@@ -11,6 +11,7 @@ require:
    .util ->
       rename, Renamer
       task-function
+   lodash
    path
 
 provide:
@@ -20,16 +21,60 @@ provide:
    rename, Renamer
    Write, Delete, commit-all
    Engage
+   task
+   each!
+
+
+debounce{delay}{f} =
+   lodash.debounce{f, delay}
 
 
 class Engage:
    constructor{@main-task, @options = {=}} =
+      @options.debounce or= 25
       @options.log or= console.log
       @options.rename or= Renamer{@options}
    run{} =
-      @state = State{FileSystem{@options}, input-self = true}
-      @dstate = DependentState{@state, @main-task, clobber-patch = false}
+      @state = State{FileSystem{@options}, input-self = true, commit-policy = null}
+      @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
+         @state.commit{}
+      @reac = Function{@state, @main-task, {clobber-patch = false}}
       @act{}
-      @dstate.add-listener{-> @act{}}
-   act{} =
-      commit-all{@dstate.get{}, @options}
+      @reac.sync{-> @act{}}
+   async act{} =
+      commit-all{await @reac.get{}, @options}
+
+
+macro{task-function} task-macro{expr} =
+   let {"task-function" => tfn} = @deps
+   {system, it, self} = @mark{`system`, `@`, `self`}
+   @multimacro with {
+      project{match expr} =
+         `_lambda{^args, ^pre, ^body, ^post, ^gen}` ->
+            ```
+            [^tfn] with eager-async with
+               _lambda{^args, ^pre, [let ^it and ^self = this, ^body], ^post, ^gen}
+            ```
+         `^args -> ^body` ->
+            ```
+            [^tfn] with eager-async with
+               ^args ->
+                  let ^it and ^self = this
+                  ^body
+            ```
+         else ->
+            print expr
+            throw E.syntax.invalid-task{"invalid", node = expr}
+   }
+
+task = task-function
+task.macro = task-macro
+
+macro{task-function} [each!]{#data{expr, body}} =
+   let {"task-function" => tfn} = @deps
+   ```
+   rawf{x} = match x: ^body
+   f = [^tfn]{rawf}
+   ^expr each x -> f{x}
+   ```
+
