@@ -1,6 +1,6 @@
 
 require:
-   spacecore2 ->
+   quasar ->
       cached-function, State, Function
    .directory ->
       FileIterator, FileSystem, Directory
@@ -77,4 +77,6 @@ macro{task-function} [each!]{#data{expr, body}} =
    f = [^tfn]{rawf}
    ^expr each x -> f{x}
    ```
+
+provide = Engage
 
