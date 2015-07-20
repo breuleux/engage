@@ -16,9 +16,10 @@ Principles
 * **Easy**: engage's API is simple and doesn't really require any new
   concepts or boilerplate.
 
-  Done. Did you need a plugin? No.
+* **No frivolous plugins**: any function that operates a source to
+  source transform can just be used directly, there is no need for a
+  specific plugin to, say, transform Markdown files with engage.
 
-* **No frivolous plugins**: see above.
 
 
 Examples
