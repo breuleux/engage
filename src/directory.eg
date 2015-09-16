@@ -295,7 +295,7 @@ class DirectoryProxy < Directory:
 
    .delete{key} =
       data = @[fields.obj].data[key]
-      type = if{String? data, data, data.type}
+      type = if{String? data or not data, data, data.type}
       @[methods.register-patch]{key, -> #delete{} &: {type = type}}
 
    gen [^Symbol.iterator]{} =
