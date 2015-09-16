@@ -1,5 +1,5 @@
 {
-  "name": "engage",
+  "name": "@breuleux/engage",
   "description": "Incremental task runner",
   "version": "0.0.0",
   "format": "cjs",
