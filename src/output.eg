@@ -66,6 +66,8 @@ commit-all{match, options = {=}} =
    Array? instructions ->
       instructions each x ->
          commit-all{x, options}
+   Error? err ->
+      options.error??{err}
    instruction and {=> commit} ->
       instruction.commit{options}
    else ->
