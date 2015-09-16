@@ -33,16 +33,21 @@ class Engage:
    constructor{@main-task, @options = {=}} =
       @options.debounce or= 25
       @options.log or= console.log
+      @options.error or= console.error
       @options.rename or= Renamer{@options}
    run{} =
       @state = State{FileSystem{@options}, input-self = true, commit-policy = null}
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
       @reac = Function{@state, @main-task, {clobber-patch = false}}
-      @act{}
+      ;; @act{}
       @reac.sync{-> @act{}}
    async act{} =
-      commit-all{await @reac.get{}, @options}
+      results = await @reac.get{}
+      commit-all{results, @options}
+
+globals: exports
+exports and module.exports = Engage
 
 
 macro{task-function} task-macro{expr} =
@@ -73,10 +78,8 @@ task.macro = task-macro
 macro{task-function} [each!]{#data{expr, body}} =
    let {"task-function" => tfn} = @deps
    ```
-   rawf{x} = match x: ^body
+   eager-async rawf{x} = match x: ^body
    f = [^tfn]{rawf}
-   ^expr each x -> f{x}
+   await all [^expr each x -> f{x}]
    ```
-
-provide = Engage
 
