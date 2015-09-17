@@ -1,13 +1,13 @@
 {
-  "name": "@breuleux/engage",
+  "name": "engage",
   "description": "Incremental task runner",
-  "version": "0.0.0",
+  "version": "0.0.6",
   "format": "cjs",
   "repository": {
     "type": "git",
     "url": "https://github.com/breuleux/engage"
   },
-  "keywords": [],
+  "keywords": ["builder", "build", "reactive", "incremental", "task"],
   "author": "Olivier Breuleux",
   "license": "MIT",
   "main": "./lib/index.js",
