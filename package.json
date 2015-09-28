@@ -17,7 +17,7 @@
     "lodash": "^3.10.0",
     "minimatch": "^2.0.8",
     "mkdirp": "^0.5.1",
-    "quasar": ">=0.0.0"
+    "quasar": ">=0.0.15"
   },
   "devDependencies": {
     "earlgrey": ">=0.0.12",
