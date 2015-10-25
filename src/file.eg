@@ -3,6 +3,7 @@ require:
    quasar ->
       ID, methods, fields
       setup-proxy, deprox, proxy
+      register
    .output ->
       read-from
    path
@@ -15,33 +16,77 @@ provide:
 
 class File:
    type = .file
-   constructor{@path} =
+   constructor{@path, @last-time = Date{}} =
       pass
    stat{} =
+      @last-time
       fs.lstat-sync{@path}
    read{} =
+      @last-time
       read-from[@path] = true
       fs.read-file-sync{@path}
+   touch{} =
+      @last-time = Date{}
 
-   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
-      FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
+   ;; [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
+   ;;    FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
 
-   [^methods.iterate-properties]{} = {}
+   ;; [^methods.iterate-properties]{} = {}
 
-   [^methods.fork]{dir} =
-      File{@path}
+   ;; [^methods.fork]{dir} =
+   ;;    File{@path}
 
-   [^methods.patch]{patch, dir} =
-      pass
+   ;; [^methods.patch]{patch, dir} =
+   ;;    pass
 
-   [^methods.clobber]{new-dict, dir} =
-      throw E.no-clobber{"Cannot clobber a File object."}
+   ;; [^methods.clobber]{new-dict, dir} =
+   ;;    throw E.no-clobber{"Cannot clobber a File object."}
 
-   gen [^methods.relevant-changes]{reads, writes} =
-      if writes["@read"] and reads["@read"]:
-         yield reads["@read"]
+   ;; gen [^methods.relevant-changes]{reads, writes} =
+   ;;    if writes["@read"] and reads["@read"]:
+   ;;       yield reads["@read"]
 
-   [^methods.enter]{dir} =
+Object.define-property{File.prototype, .contents} with {
+   method get{} = @read{}
+}
+
+Object.define-property{File.prototype, .text} with {
+   method get{} = @read{}.to-string{}
+}
+
+
+;; class FileProxy < File:
+;;    type = .file
+
+;;    constructor{@path, obj, tracks, patch} =
+;;       setup-proxy{@, obj, tracks, patch, quasar.ObjectTrack}
+
+;;    read{} =
+;;       @[methods.register-tracks]{.last-time}
+;;       @[fields.obj].read{}
+
+;;    stat{} =
+;;       @[methods.register-tracks]{.last-time}
+;;       proxy{@[fields.obj].stat{}
+;;             @[fields.tracks]
+;;             @[fields.patch]}
+
+;;    touch{} =
+;;       @[methods.register-patch]{.last-time, #update{Date{}}}
+
+
+register{File.prototype} with {
+   package = require: ..package
+   serialize{value} =
+      {path = value.path
+       last-time = value.last-time}
+   create{} =
+      Object.create{File.prototype}
+   fill{x, fields} =
+      x.path = fields.path
+      x.last-time = fields.last-time
+
+   enter{@, dir} =
       s = dir[fields.associated-state]
       prox = s.model{@}
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
@@ -54,39 +99,12 @@ class File:
                @_watcher.unwatch{@path}
             else ->
                print 'Untracked event: file::{event}'
-
-   [^methods.exit]{dir} =
+   exit{@, dir} =
       if @_watcher:
          @_watcher.unwatch{@path}
 
-Object.define-property{File.prototype, .contents} with {
-   method get{} = @read{}
+   ;; proxy{deprox! value, tracks, patch} =
+   ;;    FileProxy{value.path, value, tracks, patch}
 }
 
-Object.define-property{File.prototype, .text} with {
-   method get{} = @read{}.to-string{}
-}
-
-
-class FileProxy < File:
-   type = .file
-
-   constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
-      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
-
-   read{} =
-      @[methods.check-dirty-read]{"@read"}
-      @[methods.register-tracks]{"@read", -> true}
-      @[fields.obj].read{}
-
-   stat{} =
-      @[methods.check-dirty-read]{"@read"}
-      @[methods.register-tracks]{"@read", -> true}
-      proxy{@[fields.obj].stat{}
-            @[fields.tracks]
-            @[fields.patch]
-            @[fields.prevent-dirty-reads]}
-
-   touch{} =
-      @[methods.register-patch]{"@read", -> true}
 
