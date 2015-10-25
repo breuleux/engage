@@ -5,6 +5,7 @@ require:
       methods, fields
       setup-proxy, deprox, proxy
       current-context
+      register
    path
    fs
    .file ->
@@ -60,13 +61,14 @@ class FileIterator:
 
 analyze-path{p >> p.split{"/"}} =
    var i = 0
-   if p.length > 1 and p[0] === "":
-      p[0] = "/"
-   p[.. -1] each part ->
-      if R"*"? part: break
+   p[... -1] each part ->
+      if R"\*"? part:
+         break
       i += 1
-   {base = p.slice{0, i}
+   {base = p.slice{0, i}.join{"/"} or "/"
     rest = p.slice{i}}
+
+
 
 class FileSystem:
 
@@ -94,25 +96,24 @@ class FileSystem:
 
    find{glob} =
       {=> base, => rest} = analyze-path{glob}
+      print {base, rest}
       @get{base}.find{rest.join{"/"}}
 
-   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
-      FileSystemProxy{@, tracks, patch, prevent-dirty-reads}
+   ;; [^methods.proxy]{tracks, patch} =
+   ;;    FileSystemProxy{@, tracks, patch}
 
 
 class FileSystemProxy < FileSystem:
 
-   constructor{obj, tracks, patch, prevent-dirty-reads = true} =
+   constructor{obj, tracks, patch} =
       [@] &: obj.options
-      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
-
-   _prox{x} =
-      proxy{x, @[fields.tracks], @[fields.patch], @[fields.prevent-dirty-reads]}
+      setup-proxy{@, obj, tracks, patch}
 
    get{key} =
-      @[methods.check-dirty-read]{key}
-      @[methods.register-tracks]{key, -> true}
-      @_prox{@[fields.obj].get{key}}
+      @[methods.register-tracks]{key}
+      proxy{@[fields.obj].get{key}
+            @[fields.tracks]
+            @[fields.patch]}
       
 
 
@@ -192,42 +193,143 @@ class Directory:
    gen [^Symbol.iterator]{} =
       keys{@data} each k -> yield @get{k}
 
-   [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
-      DirectoryProxy{@path, @, tracks, patch, prevent-dirty-reads}
+   ;; [^methods.proxy]{tracks, patch} =
+   ;;    DirectoryProxy{@path, @, tracks, patch}
 
-   [^methods.iterate-properties]{} =
-      Object.prototype[methods.iterate-properties].call{@data, @}
+   ;; [^methods.iterate-properties]{} =
+   ;;    Object.prototype[methods.iterate-properties].call{@data, @}
 
-   [^methods.fork]{} =
-      rval = Object.create{Directory.prototype}
-      rval.path = @path
-      rval.data = {=}
-      items{@data} each {key, value} ->
-         rval.data[key] = value
-      rval
+   ;; [^methods.fork]{} =
+   ;;    rval = Object.create{Directory.prototype}
+   ;;    rval.path = @path
+   ;;    rval.data = {=}
+   ;;    items{@data} each {key, value} ->
+   ;;       rval.data[key] = value
+   ;;    rval
 
-   [^methods.patch]{patch, dir} =
-      Object.prototype[methods.patch].call{@data, patch, dir, @}
+   ;; [^methods.patch]{patch, dir} =
+   ;;    Object.prototype[methods.patch].call{@data, patch, dir, @}
 
-   [^methods.clobber]{new-dict, dir} =
-      throw E.no-clobber{"Cannot clobber a Directory object."}
+   ;; [^methods.clobber]{new-dict, dir} =
+   ;;    throw E.no-clobber{"Cannot clobber a Directory object."}
 
-   gen [^methods.relevant-changes]{reads, writes} =
-      items{reads or {=}} each {match name, entry} ->
-         R"^@:(.*)"! {_, minimatch.make-re! x} ->
+
+
+class DirectoryProxy < Directory:
+   type = .directory
+
+   constructor{@path, obj, tracks, patch} =
+      setup-proxy{@, obj, tracks, patch, DirectoryTrack}
+
+   _prox{x} =
+      proxy{x, @[fields.tracks], @[fields.patch]}
+
+   find{glob} =
+      gen g{} =
+         match glob.split{"/"}:
+            {""} ->
+               yield [@]
+            {"**", *rest} ->
+               yield all @find{rest.join{"/"}}
+               @[methods.register-tracks]{"//directories"}
+               [@[fields.obj]] each entry when entry.find ->
+                  yield all @_prox{entry}.find{glob}
+            {orig and minimatch.make-re! x, *rest} ->
+               @[methods.register-tracks]{'//:{orig}'}
+               @[fields.obj].keys{} each
+                  x? name ->
+                     entry = @get{name}
+                     if rest == {}:
+                        yield entry
+                     elif entry.type === "directory":
+                        yield all entry.find{rest.join{"/"}}
+                  else ->
+                     continue
+      FileIterator{g{}}
+
+   get{key} =
+      @[methods.register-tracks]{key}
+      @_prox{@[fields.obj].get{key}}
+
+   set{key, value} =
+      @[methods.register-patch]{key, #update{deprox{value}} &: {type = value}}
+
+   .delete{key} =
+      data = @[fields.obj].data[key]
+      type = if{String? data or not data, data, data.type}
+      @[methods.register-patch]{key, #delete{} &: {type = type}}
+
+   gen [^Symbol.iterator]{} =
+      @entries{} each {_, v} -> yield v
+
+   keys{} =
+      @[methods.register-tracks]{"//iter"}
+      @[fields.obj].keys{}
+
+   entries{} =
+      @[methods.register-tracks]{"//iter"}
+      @[fields.obj].entries{} each {k, v} ->
+         {k, proxy{v
+                   @[fields.tracks]
+                   @[fields.patch]}}
+
+
+class DirectoryTrack:
+   gen [^methods.relevant-changes]{writes} =
+      items{@} each {match name, entry} ->
+         R"^//:(.*)"! {_, minimatch.make-re! x} ->
             items{writes or {=}} each {wname, _} when x? wname ->
                yield entry
          else ->
             pass
       items{writes or {=}} each match {name, cmd} ->
-         when reads[name] ->
-            yield reads[name]
-         when cmd.type === .directory and reads["@directories"] ->
-            yield reads["@directories"]
-         when reads["@iter"] ->
-            yield reads["@iter"]
+         when @[name] ->
+            yield @[name]
+         when cmd.type === .directory and @["//directories"] ->
+            yield @["//directories"]
+         when @["//iter"] ->
+            yield @["//iter"]
 
-   [^methods.enter]{dir} =
+
+
+
+register{FileSystem.prototype} with {
+
+   package = require: ..package
+
+   serialize{value} =
+      {options = value.options
+       directory-cache = value.directory-cache}
+   create{} =
+      Object.create{FileSystem.prototype}
+   fill{fs, fields} =
+      fs.options = fields.options
+      fs.directory-cache = fields.directory-cache
+
+   proxy{deprox! value, tracks, patch} =
+      FileSystemProxy{value, tracks, patch}
+}
+
+
+register{Directory.prototype} with {
+
+   package = require: ..package
+
+   serialize{value} =
+      {"//path" => value.path} &: [object with items{value.data}]
+   create{} =
+      Object.create{Directory.prototype}
+   fill{dir, fields} =
+      dir.data = {=}
+      items{fields} each {match k, v} ->
+         "//path" -> dir.path = v
+         "//iter" -> pass
+         else -> dir.data[k] = v
+
+   proxy{deprox! value, tracks, patch} =
+      DirectoryProxy{value.path, value, tracks, patch}
+
+   enter{@, dir} =
       s = dir[fields.associated-state]
       prox = s.model{@}
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
@@ -247,69 +349,8 @@ class Directory:
             else ->
                print 'Untracked event: dir::{event}'
 
-   [^methods.exit]{dir} =
+   exit{@, dir} =
       if @_watcher:
          @_watcher.unwatch{@path}
-
-
-
-class DirectoryProxy < Directory:
-   type = .directory
-
-   constructor{@path, obj, tracks, patch, prevent-dirty-reads = true} =
-      setup-proxy{@, obj, tracks, patch, prevent-dirty-reads}
-
-   _prox{x} =
-      proxy{x, @[fields.tracks], @[fields.patch], @[fields.prevent-dirty-reads]}
-
-   find{glob} =
-      gen g{} =
-         match glob.split{"/"}:
-            {""} ->
-               yield [@]
-            {"**", *rest} ->
-               yield all @find{rest.join{"/"}}
-               @[methods.register-tracks]{"@directories", -> true}
-               [@[fields.obj]] each entry when entry.find ->
-                  yield all @_prox{entry}.find{glob}
-            {orig and minimatch.make-re! x, *rest} ->
-               @[methods.register-tracks]{'@:{orig}', -> true}
-               @[fields.obj].keys{} each
-                  x? name ->
-                     entry = @get{name}
-                     if rest == {}:
-                        yield entry
-                     elif entry.type === "directory":
-                        yield all entry.find{rest.join{"/"}}
-                  else ->
-                     continue
-      FileIterator{g{}}
-
-   get{key} =
-      @[methods.check-dirty-read]{key}
-      @[methods.register-tracks]{key, -> true}
-      @_prox{@[fields.obj].get{key}}
-
-   set{key, value} =
-      @[methods.register-patch]{key, -> #update{deprox{value}} &: {type = value}}
-
-   .delete{key} =
-      data = @[fields.obj].data[key]
-      type = if{String? data or not data, data, data.type}
-      @[methods.register-patch]{key, -> #delete{} &: {type = type}}
-
-   gen [^Symbol.iterator]{} =
-      @entries{} each {_, v} -> yield v
-
-   keys{} =
-      @[methods.register-tracks]{"@iter", -> true}
-      @[fields.obj].keys{}
-
-   entries{} =
-      @[methods.register-tracks]{"@iter", -> true}
-      @[fields.obj].entries{} each {k, v} ->
-         {k, proxy{v
-                   @[fields.tracks]
-                   @[fields.patch]
-                   @[fields.prevent-dirty-reads]}}
+}
 
