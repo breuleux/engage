@@ -1,7 +1,7 @@
 
 require:
    quasar ->
-      ID, methods, fields
+      ID, symbols
       setup-proxy, deprox, proxy
       register
    .output ->
@@ -87,7 +87,7 @@ register{File.prototype} with {
       x.last-time = fields.last-time
 
    enter{@, dir} =
-      s = dir[fields.associated-state]
+      s = dir[symbols.associated-state]
       prox = s.model{@}
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
          {match event, p >> path.relative{@path, p}} ->

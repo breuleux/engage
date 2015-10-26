@@ -1,8 +1,7 @@
 
 require:
    quasar ->
-      ID, DIRECTORY
-      methods, fields
+      ID, DIRECTORY, symbols
       setup-proxy, deprox, proxy
       current-context
       register
@@ -96,7 +95,6 @@ class FileSystem:
 
    find{glob} =
       {=> base, => rest} = analyze-path{glob}
-      print {base, rest}
       @get{base}.find{rest.join{"/"}}
 
    ;; [^methods.proxy]{tracks, patch} =
@@ -110,10 +108,10 @@ class FileSystemProxy < FileSystem:
       setup-proxy{@, obj, tracks, patch}
 
    get{key} =
-      @[methods.register-tracks]{key}
-      proxy{@[fields.obj].get{key}
-            @[fields.tracks]
-            @[fields.patch]}
+      @[symbols.register-tracks]{key}
+      proxy{@[symbols.obj].get{key}
+            @[symbols.tracks]
+            @[symbols.patch]}
       
 
 
@@ -222,7 +220,7 @@ class DirectoryProxy < Directory:
       setup-proxy{@, obj, tracks, patch, DirectoryTrack}
 
    _prox{x} =
-      proxy{x, @[fields.tracks], @[fields.patch]}
+      proxy{x, @[symbols.tracks], @[symbols.patch]}
 
    find{glob} =
       gen g{} =
@@ -231,12 +229,12 @@ class DirectoryProxy < Directory:
                yield [@]
             {"**", *rest} ->
                yield all @find{rest.join{"/"}}
-               @[methods.register-tracks]{"//directories"}
-               [@[fields.obj]] each entry when entry.find ->
+               @[symbols.register-tracks]{"//directories"}
+               [@[symbols.obj]] each entry when entry.find ->
                   yield all @_prox{entry}.find{glob}
             {orig and minimatch.make-re! x, *rest} ->
-               @[methods.register-tracks]{'//:{orig}'}
-               @[fields.obj].keys{} each
+               @[symbols.register-tracks]{'//:{orig}'}
+               @[symbols.obj].keys{} each
                   x? name ->
                      entry = @get{name}
                      if rest == {}:
@@ -248,34 +246,34 @@ class DirectoryProxy < Directory:
       FileIterator{g{}}
 
    get{key} =
-      @[methods.register-tracks]{key}
-      @_prox{@[fields.obj].get{key}}
+      @[symbols.register-tracks]{key}
+      @_prox{@[symbols.obj].get{key}}
 
    set{key, value} =
-      @[methods.register-patch]{key, #update{deprox{value}} &: {type = value}}
+      @[symbols.register-patch]{key, #update{deprox{value}} &: {type = value}}
 
    .delete{key} =
-      data = @[fields.obj].data[key]
+      data = @[symbols.obj].data[key]
       type = if{String? data or not data, data, data.type}
-      @[methods.register-patch]{key, #delete{} &: {type = type}}
+      @[symbols.register-patch]{key, #delete{} &: {type = type}}
 
    gen [^Symbol.iterator]{} =
       @entries{} each {_, v} -> yield v
 
    keys{} =
-      @[methods.register-tracks]{"//iter"}
-      @[fields.obj].keys{}
+      @[symbols.register-tracks]{"//iter"}
+      @[symbols.obj].keys{}
 
    entries{} =
-      @[methods.register-tracks]{"//iter"}
-      @[fields.obj].entries{} each {k, v} ->
+      @[symbols.register-tracks]{"//iter"}
+      @[symbols.obj].entries{} each {k, v} ->
          {k, proxy{v
-                   @[fields.tracks]
-                   @[fields.patch]}}
+                   @[symbols.tracks]
+                   @[symbols.patch]}}
 
 
 class DirectoryTrack:
-   gen [^methods.relevant-changes]{writes} =
+   gen [^symbols.relevant-changes]{writes} =
       items{@} each {match name, entry} ->
          R"^//:(.*)"! {_, minimatch.make-re! x} ->
             items{writes or {=}} each {wname, _} when x? wname ->
@@ -330,7 +328,7 @@ register{Directory.prototype} with {
       DirectoryProxy{value.path, value, tracks, patch}
 
    enter{@, dir} =
-      s = dir[fields.associated-state]
+      s = dir[symbols.associated-state]
       prox = s.model{@}
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
          {match event, p >> path.relative{@path, p}} ->
