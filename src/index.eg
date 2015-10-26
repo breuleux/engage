@@ -36,7 +36,7 @@ class Engage:
       @options.error or= console.error
       @options.rename or= Renamer{@options}
    run{} =
-      @state = State{FileSystem{@options}, input-self = true, commit-policy = null}
+      @state = State{FileSystem{@options}, commit-policy = null}
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
       @reac = Function{@state, @main-task, {clobber-patch = false}}
@@ -52,7 +52,7 @@ exports and module.exports = Engage
 
 macro{task-function} task-macro{expr} =
    let {"task-function" => tfn} = @deps
-   {system, it, self} = @mark{`system`, `@`, `self`}
+   {it, self} = @mark{`@`, `self`}
    @multimacro with {
       project{match expr} =
          `_lambda{^args, ^pre, ^body, ^post, ^gen}` ->
