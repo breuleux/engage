@@ -97,9 +97,6 @@ class FileSystem:
       {=> base, => rest} = analyze-path{glob}
       @get{base}.find{rest.join{"/"}}
 
-   ;; [^methods.proxy]{tracks, patch} =
-   ;;    FileSystemProxy{@, tracks, patch}
-
 
 class FileSystemProxy < FileSystem:
 
@@ -190,26 +187,6 @@ class Directory:
 
    gen [^Symbol.iterator]{} =
       keys{@data} each k -> yield @get{k}
-
-   ;; [^methods.proxy]{tracks, patch} =
-   ;;    DirectoryProxy{@path, @, tracks, patch}
-
-   ;; [^methods.iterate-properties]{} =
-   ;;    Object.prototype[methods.iterate-properties].call{@data, @}
-
-   ;; [^methods.fork]{} =
-   ;;    rval = Object.create{Directory.prototype}
-   ;;    rval.path = @path
-   ;;    rval.data = {=}
-   ;;    items{@data} each {key, value} ->
-   ;;       rval.data[key] = value
-   ;;    rval
-
-   ;; [^methods.patch]{patch, dir} =
-   ;;    Object.prototype[methods.patch].call{@data, patch, dir, @}
-
-   ;; [^methods.clobber]{new-dict, dir} =
-   ;;    throw E.no-clobber{"Cannot clobber a Directory object."}
 
 
 

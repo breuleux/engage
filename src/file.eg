@@ -28,23 +28,6 @@ class File:
    touch{} =
       @last-time = Date{}
 
-   ;; [^methods.proxy]{tracks, patch, prevent-dirty-reads} =
-   ;;    FileProxy{@path, @, tracks, patch, prevent-dirty-reads}
-
-   ;; [^methods.iterate-properties]{} = {}
-
-   ;; [^methods.fork]{dir} =
-   ;;    File{@path}
-
-   ;; [^methods.patch]{patch, dir} =
-   ;;    pass
-
-   ;; [^methods.clobber]{new-dict, dir} =
-   ;;    throw E.no-clobber{"Cannot clobber a File object."}
-
-   ;; gen [^methods.relevant-changes]{reads, writes} =
-   ;;    if writes["@read"] and reads["@read"]:
-   ;;       yield reads["@read"]
 
 Object.define-property{File.prototype, .contents} with {
    method get{} = @read{}
@@ -54,25 +37,6 @@ Object.define-property{File.prototype, .text} with {
    method get{} = @read{}.to-string{}
 }
 
-
-;; class FileProxy < File:
-;;    type = .file
-
-;;    constructor{@path, obj, tracks, patch} =
-;;       setup-proxy{@, obj, tracks, patch, quasar.ObjectTrack}
-
-;;    read{} =
-;;       @[methods.register-tracks]{.last-time}
-;;       @[fields.obj].read{}
-
-;;    stat{} =
-;;       @[methods.register-tracks]{.last-time}
-;;       proxy{@[fields.obj].stat{}
-;;             @[fields.tracks]
-;;             @[fields.patch]}
-
-;;    touch{} =
-;;       @[methods.register-patch]{.last-time, #update{Date{}}}
 
 
 register{File.prototype} with {
@@ -102,9 +66,6 @@ register{File.prototype} with {
    exit{@, dir} =
       if @_watcher:
          @_watcher.unwatch{@path}
-
-   ;; proxy{deprox! value, tracks, patch} =
-   ;;    FileProxy{value.path, value, tracks, patch}
 }
 
 

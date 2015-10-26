@@ -40,7 +40,6 @@ class Engage:
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
       @reac = Function{@state, @main-task, {clobber-patch = false}}
-      ;; @act{}
       @reac.sync{-> @act{}}
    async act{} =
       results = await @reac.get{}
