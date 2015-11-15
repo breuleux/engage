@@ -34,12 +34,12 @@ Here is how you would compile all the `.md` files in `./content` to
 var engage = require("engage");
 var marked = require("marked");
 
-var rootPath = "./content"
-var outPath = "./out"
+var rootPath = "./content";
+var outPath = "./out";
 
 var tMarkdown = engage.task(function () {
     this.get(this.rootPath).find("**/*.md").map(function (file) {
-        destination = this.renameOut(file, {extension: ".html"})
+        destination = this.renameOut(file, {extension: ".html"});
         this.log("Writing file: " + destination.path);
         destination.write(marked(file.text));
     });
@@ -55,13 +55,13 @@ opts = {
 engage(tMarkdown, opts).run();
 ```
 
-And here's **what you gain**:
+And here's what you gain:
 
 * `engage.task` and `map` track all reads and all file changes so that
   work can be minimized:
-  * Modify a Markdown file and only that file will be recompiled.
-  * Add a Markdown file and it will be compiled along the others.
-  * You can also add new directories, and so on.
+  * Modify a `.md` file and only that file will be recompiled.
+  * Add a `.md` file and it will be compiled along the others.
+  * You can create new directories, add `.md` files in them, etc.
 
 * There is no `engage-marked` package. There is no need for one. The
   `marked` function takes a string and returns a string and that's all
@@ -74,12 +74,12 @@ And here's **what you gain**:
 * Deriving the output file from the source file is made super easy by
   the `Renamer` class:
   * `Renamer({from: "abc", to: "xyz"})` swaps the "abc" base for "xyz".
-  * `Renamer({rebase: {"abc": "xyz"})` does the same thing, but you can
+  * `Renamer({rebase: {"abc": "xyz"}})` does the same thing, but you can
     define more than one rebase.
-  * `Renamer({extension: ".hello"})` swaps the extension for another.
+  * `Renamer({extension: ".hello"})` swaps an extension for another.
   * All options can be given in the constructor *and/or* in the `rename`
     method.
-  * *You* define your renamer. You can even give it the name you want.
+  * *You* define your renamer.
 
 Also note that logging is your responsibility. You can use whatever
 logger you want (`console.log` is the default).
@@ -96,6 +96,9 @@ example, so focus mainly on `tCat` and `tMain`.
 ```javascript
 var engage = require("engage");
 
+var rootPath = "./content";
+var outPath = "./out";
+
 var tCat = engage.task(function(root) {
     var filesContents = root.find("**/*.cat").map(function (file) {
         this.log("Read " + file.path);
@@ -111,9 +114,6 @@ var tMain = task(function () {
     tCat(root.get("partsA"));
     tCat(root.get("partsB"));
 });
-
-var rootPath = "./content"
-var outPath = "./out"
 
 opts = {
     renameOut: Renamer({from: rootPath, to: outPath}),
@@ -169,11 +169,11 @@ In order for a task to work properly there are a few rules to follow:
 
 * A task must execute synchronously.
 
-* The _only side-effects a task should have are writing to the
+* The *only* side-effects a task should have are writing to the
   filesystem or logging. That's what `engage` is built to handle. This
-  being said: do __not mutate data in a task: do _not modify fields in
-  objects, do _not push data in arrays, and so on. I'm not saying it
-  _won't work, but with all the re-executing and caching of tasks
+  being said: do **not** mutate data in a task: do *not* modify fields
+  in objects, do *not* push data in arrays, and so on. I'm not saying
+  it *won't* work, but with all the re-executing and caching of tasks
   there are a lot of things that could go wrong.
 
 
