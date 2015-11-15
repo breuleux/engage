@@ -49,7 +49,7 @@ class Engage:
       v = await @reac.get{} ;; ???
       commit-all{v, @options}
    async err{e} =
-      @options.error{"An error occurred!!"}
+      @options.error{"An error occurred."}
       @options.error{e.stack}
 
 
@@ -75,7 +75,7 @@ macro{task-function} task-macro{expr} =
                   ^body
             ```
          else ->
-            print expr
+            ;; print expr
             throw E.syntax.invalid-task{"invalid", node = expr}
    }
 

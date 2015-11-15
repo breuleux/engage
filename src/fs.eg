@@ -40,6 +40,7 @@ class FileIterator:
       @results = null
    gen [^Symbol.iterator]{} =
       if @results:
+         throw E.engage{"Do not run FileIterator twice"}
          @results each x -> yield x
       else:
          results = {}
@@ -212,12 +213,11 @@ class FSNode:
    .keys{} =
       keys{@get-files{}}
 
-   entries{} =      
-      items{@get-files{}}
+   entries{} =
+      keys{@get-files{}} each k -> {k, @get{k}}
 
    gen [^Symbol.iterator]{} =
-      items{@get-files{}} each {_, f} -> yield f
-      ;; keys{@data} each k -> yield @get{k}
+      @entries{} each {k, v} -> yield v
 
 
 
@@ -241,11 +241,11 @@ class FSNodeProxy < FSNode:
    _prox{x} =
       proxy{x, @[symbols.tracks], @[symbols.patch]}
 
-   __touch{} =
+   touch{} =
       @[symbols.register-patch]{"//last-time"} with
          #update{Date{}}
 
-   __touch-directory{} =
+   touch-directory{} =
       @[symbols.register-patch]{"//directories"} with
          #update{true}
 
@@ -259,9 +259,10 @@ class FSNodeProxy < FSNode:
                @[symbols.register-tracks]{"//directories"}
                [@[symbols.obj]] each entry when entry.type === .directory ->
                   yield all @_prox{entry}.find{glob}
+
             {orig and minimatch.make-re! x, *rest} ->
                @[symbols.register-tracks]{'//:{orig}'}
-               @[symbols.obj].entries{} each
+               @entries{} each
                   {x? name, entry} ->
                      if rest == {}:
                         yield entry
@@ -276,9 +277,11 @@ class FSNodeProxy < FSNode:
       @_prox{@[symbols.obj].get{key}}
 
    set{key, value} =
+      @[symbols.obj].get-files{}
       @[symbols.register-patch]{key, #update{deprox{value}} &: {type = value}}
 
    .delete{key} =
+      @[symbols.obj].get-files{}
       data = @[symbols.obj]._files[key]
       type = data??.type
       @[symbols.register-patch]{key, #delete{} &: {type = type}}
@@ -368,7 +371,7 @@ register{FSNode.prototype} with {
          "//path" -> fsn.path = v
          "//last-time" -> fsn.last-time = v
          "//has-files" -> fsn._files = if{v, {=}, null}
-         "//iter" -> pass
+         R"^//"? -> pass
          else -> fsn._files[k] = v
 
    proxy{deprox! value, tracks, patch} =
@@ -392,7 +395,7 @@ register{FSNode.prototype} with {
                   @_watcher.unwatch{@path}
                   s.transact with -> prox.type = null
                .change ->
-                  s.transact with -> prox.__touch{}
+                  s.transact with -> prox.touch{}
                else ->
                   print 'Untracked event: {event}'
             .add ->
@@ -400,7 +403,7 @@ register{FSNode.prototype} with {
             .add-dir ->
                s.transact with ->
                   prox.set{p, dir.acquire{FSNode{fp}}}
-                  prox.__touch-directory{}
+                  prox.touch-directory{}
             .unlink or .unlink-dir ->
                s.transact with -> prox.delete{p}
             .change ->
