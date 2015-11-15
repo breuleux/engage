@@ -5,26 +5,24 @@ require:
       setup-proxy, deprox, proxy
       current-context
       register
+   .output ->
+      read-from, Write
+   .util ->
+      task-function
    path
    fs
-   .file ->
-      File
-   .util ->
-      Renamer, task-function
-   .output ->
-      Write
    chokidar
    minimatch
 
 provide:
    FileIterator
    FileSystem
-   Directory
+   FSNode
 
 
 
 extract-text-transformer{f} =
-   method new-f{File? file, options} =
+   method new-f{file, options} =
       state = current-context{}??.state
       if not state:
          throw E.map-file{"Cannot find a renaming function to use."}
@@ -52,9 +50,9 @@ class FileIterator:
    map{fn} =
       t = task-function{fn}
       [@] each x -> t{x}
-   map-file{options = {=}, fn} =
-      t = task-function{fn, extract-text-transformer}
-      [@] each file -> t{file, {=} & options}
+   ;; map-file{options = {=}, fn} =
+   ;;    t = task-function{fn, extract-text-transformer}
+   ;;    [@] each file -> t{file, {=} & options}
    bundle{fn} =
       throw E.todo{}
 
@@ -68,6 +66,9 @@ analyze-path{p >> p.split{"/"}} =
     rest = p.slice{i}}
 
 
+;;;;;;;;;;;;;;;;
+;; FileSystem ;;
+;;;;;;;;;;;;;;;;
 
 class FileSystem:
 
@@ -78,12 +79,7 @@ class FileSystem:
    get{p} =
       match @directory-cache[p]:
          undefined? ->
-            stat = fs.lstat-sync{p}
-            entry =
-               if stat.is-directory{}:
-                  Directory{p}
-               else:
-                  File{p}
+            entry = FSNode{p}
             expr-value @directory-cache[p] =
                match @[DIRECTORY]:
                   undefined? ->
@@ -109,24 +105,72 @@ class FileSystemProxy < FileSystem:
       proxy{@[symbols.obj].get{key}
             @[symbols.tracks]
             @[symbols.patch]}
-      
 
 
-class Directory:
 
-   type = .directory
 
-   constructor{@path} =
-      @data = Object.create{null}
-      fs.readdir-sync{@path} each filename ->
-         stat = fs.lstat-sync with path.join{@path, filename}
-         @data[filename] =
+;;;;;;;;;;;;
+;; FSNode ;;
+;;;;;;;;;;;;
+
+class FSNode:
+
+   constructor{@path, @last-time = Date{}} =
+      @_files = null
+      try:
+         stat = fs.lstat-sync{@path}
+         @type =
             if stat.is-directory{}:
                .directory
             elif stat.is-file{}:
                .file
             else:
                .unsupported
+      catch e:
+         @type = null
+
+   ;;;;;;;;;;;;
+   ;; COMMON ;;
+   ;;;;;;;;;;;;
+
+   stat{} =
+      @last-time
+      fs.lstat-sync{@path}
+
+   ;; touch{} =
+   ;;    @last-time = Date{}
+
+   ;;;;;;;;;;;;;;;;;;;;
+   ;; FILE INTERFACE ;;
+   ;;;;;;;;;;;;;;;;;;;;
+
+   read{} =
+      if @type === .file:
+         @last-time
+         read-from[@path] = true
+         fs.read-file-sync{@path}
+      else:
+         throw E.engage.read{'read: {@path} is not a file'}
+
+   ;;;;;;;;;;;;;;;;;;;
+   ;; DIR INTERFACE ;;
+   ;;;;;;;;;;;;;;;;;;;
+
+   get-files{} =
+      if @_files === null:
+         @_files = Object.create{null}
+         match @[DIRECTORY]:
+            undefined? ->
+               fs.readdir-sync{@path} each filename ->
+                  full-path = path.join{@path, filename}
+                  @_files[filename] = FSNode{full-path}
+            dir ->
+               fs.readdir-sync{@path} each filename ->
+                  full-path = path.join{@path, filename}
+                  @_files[filename] = dir.acquire{FSNode{full-path}}
+         @_files
+      else:
+         @_files
 
    find{glob} =
       gen g{} =
@@ -135,7 +179,7 @@ class Directory:
                yield [@]
             {"**", *rest} ->
                yield all @find{rest.join{"/"}}
-               [@] each entry when entry.find ->
+               [@] each entry when entry.type === .directory ->
                   yield all entry.find{glob}
             {minimatch.make-re! x, *rest} ->
                @keys{} each
@@ -150,54 +194,60 @@ class Directory:
       FileIterator{g{}}
 
    get{key} =
+      @get-files{}
       match key.split{"/"}:
          {file} ->
-            full-path = path.join{@path, key}
-            match @data[key]:
-               .file ->
-                  expr-value @data[key] =
-                     match @[DIRECTORY]:
-                        undefined? -> File{full-path}
-                        dir -> dir.acquire{File{full-path}}
-               .directory ->
-                  expr-value @data[key] =
-                     match @[DIRECTORY]:
-                        undefined? -> Directory{full-path}
-                        dir -> dir.acquire{Directory{full-path}}
-               .unsupported ->
-                  throw E.unsupported-file{full-path}
-               undefined? ->
-                  throw E.not-found{'{@path}/{key}'}
-               x ->
-                  x
+            @_files[file]
          {base, *rest} ->
             @get{base}.get{rest.join{"/"}}
 
    set{String? key or Number? key, value} =
-      @data[key] = value
+      @get-files{}
+      @_files[key] = value
 
    .delete{key} =
-      delete @data[key]
+      @get-files{}
+      delete @_files[key]
 
    .keys{} =
-      keys{@data}
+      keys{@get-files{}}
 
-   entries{} =
-      keys{@data} each k -> {k, @get{k}}
+   entries{} =      
+      items{@get-files{}}
 
    gen [^Symbol.iterator]{} =
-      keys{@data} each k -> yield @get{k}
+      items{@get-files{}} each {_, f} -> yield f
+      ;; keys{@data} each k -> yield @get{k}
 
 
 
-class DirectoryProxy < Directory:
-   type = .directory
+;; FILE PROPERTIES
+
+Object.define-property{FSNode.prototype, .contents} with {
+   method get{} = @read{}
+}
+
+Object.define-property{FSNode.prototype, .text} with {
+   method get{} = @read{}.to-string{}
+}
+
+
+
+class FSNodeProxy < FSNode:
 
    constructor{@path, obj, tracks, patch} =
-      setup-proxy{@, obj, tracks, patch, DirectoryTrack}
+      setup-proxy{@, obj, tracks, patch, FSNodeTrack}
 
    _prox{x} =
       proxy{x, @[symbols.tracks], @[symbols.patch]}
+
+   __touch{} =
+      @[symbols.register-patch]{"//last-time"} with
+         #update{Date{}}
+
+   __touch-directory{} =
+      @[symbols.register-patch]{"//directories"} with
+         #update{true}
 
    find{glob} =
       gen g{} =
@@ -207,13 +257,12 @@ class DirectoryProxy < Directory:
             {"**", *rest} ->
                yield all @find{rest.join{"/"}}
                @[symbols.register-tracks]{"//directories"}
-               [@[symbols.obj]] each entry when entry.find ->
+               [@[symbols.obj]] each entry when entry.type === .directory ->
                   yield all @_prox{entry}.find{glob}
             {orig and minimatch.make-re! x, *rest} ->
                @[symbols.register-tracks]{'//:{orig}'}
-               @[symbols.obj].keys{} each
-                  x? name ->
-                     entry = @get{name}
+               @[symbols.obj].entries{} each
+                  {x? name, entry} ->
                      if rest == {}:
                         yield entry
                      elif entry.type === "directory":
@@ -230,8 +279,8 @@ class DirectoryProxy < Directory:
       @[symbols.register-patch]{key, #update{deprox{value}} &: {type = value}}
 
    .delete{key} =
-      data = @[symbols.obj].data[key]
-      type = if{String? data or not data, data, data.type}
+      data = @[symbols.obj]._files[key]
+      type = data??.type
       @[symbols.register-patch]{key, #delete{} &: {type = type}}
 
    gen [^Symbol.iterator]{} =
@@ -244,12 +293,26 @@ class DirectoryProxy < Directory:
    entries{} =
       @[symbols.register-tracks]{"//iter"}
       @[symbols.obj].entries{} each {k, v} ->
-         {k, proxy{v
-                   @[symbols.tracks]
-                   @[symbols.patch]}}
+         {k, proxy{v, @[symbols.tracks], @[symbols.patch]}}
+
+Object.define-property{FSNodeProxy.prototype, .type} with {
+   method get{} =
+      @[symbols.register-tracks]{"//type"}
+      @[symbols.obj].type
+   method set{type} =
+      @[symbols.register-patch]{"//type"} with
+         #update{type}
+}
+
+Object.define-property{FSNodeProxy.prototype, .last-time} with {
+   method get{} =
+      @[symbols.register-tracks]{"//last-time"}
+      @[symbols.obj].last-time
+}
 
 
-class DirectoryTrack:
+
+class FSNodeTrack:
    gen [^symbols.relevant-changes]{writes} =
       items{@} each {match name, entry} ->
          R"^//:(.*)"! {_, minimatch.make-re! x} ->
@@ -268,64 +331,83 @@ class DirectoryTrack:
 
 
 
-;; register{FileSystem.prototype} with {
-
-;;    package = require: ..package
-
-;;    serialize{value} =
-;;       {options = value.options
-;;        directory-cache = value.directory-cache}
-;;    create{} =
-;;       Object.create{FileSystem.prototype}
-;;    fill{fs, fields} =
-;;       fs.options = fields.options
-;;       fs.directory-cache = fields.directory-cache
-
-;;    proxy{deprox! value, tracks, patch} =
-;;       FileSystemProxy{value, tracks, patch}
-;; }
-
-
-register{Directory.prototype} with {
+register{FileSystem.prototype} with {
 
    package = require: ..package
 
    serialize{value} =
-      {"//path" => value.path} &: [object with items{value.data}]
+      {options = value.options
+       directory-cache = value.directory-cache}
    create{} =
-      Object.create{Directory.prototype}
-   fill{dir, fields} =
-      dir.data = {=}
-      items{fields} each {match k, v} ->
-         "//path" -> dir.path = v
-         "//iter" -> pass
-         else -> dir.data[k] = v
+      Object.create{FileSystem.prototype}
+   fill{fs, fields} =
+      fs.options = fields.options
+      fs.directory-cache = fields.directory-cache
 
    proxy{deprox! value, tracks, patch} =
-      DirectoryProxy{value.path, value, tracks, patch}
+      FileSystemProxy{value, tracks, patch}
+}
+
+
+register{FSNode.prototype} with {
+
+   package = require: ..package
+
+   serialize{value} =
+      {"//type" => value.type
+       "//path" => value.path
+       "//last-time" => value.last-time
+       "//has-files" => Boolean{value._files}} &:
+         object with items{value._files or {=}}
+   create{} =
+      Object.create{FSNode.prototype}
+   fill{fsn, fields} =
+      fsn._files = {=}
+      items{fields} each {match k, v} ->
+         "//type" -> fsn.type = v
+         "//path" -> fsn.path = v
+         "//last-time" -> fsn.last-time = v
+         "//has-files" -> fsn._files = if{v, {=}, null}
+         "//iter" -> pass
+         else -> fsn._files[k] = v
+
+   proxy{deprox! value, tracks, patch} =
+      FSNodeProxy{value.path, value, tracks, patch}
 
    enter{@, dir} =
       s = dir[symbols.associated-state]
       prox = s.model{@}
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
-         {match event, p >> path.relative{@path, p}} ->
+         {match event, fp and p >> path.relative{@path, p}} ->
+            ;; do:
+            ;;    print {event, fp, p}
+            match when p === "" ->
+               .add ->
+                  @_watcher.add{@path}
+                  prox.type = .file
+               .add-dir ->
+                  @_watcher.add{@path}
+                  prox.type = .directory
+               .unlink or .unlink-dir ->
+                  @_watcher.unwatch{@path}
+                  prox.type = null
+               .change ->
+                  s.transact with -> prox.__touch{}
+               else ->
+                  print 'Untracked event: {event}'
             .add ->
-               s.transact with -> prox.set{p, "file"}
+               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
             .add-dir ->
-               s.transact with -> prox.set{p, "directory"}
-            .unlink ->
-               s.transact with -> prox.delete{p}
-            .unlink-dir when p === "" ->
-               @_watcher.unwatch{@path}
-            .unlink-dir ->
+               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
+               prox.__touch-directory{}
+            .unlink or .unlink-dir ->
                s.transact with -> prox.delete{p}
             .change ->
                pass
             else ->
-               print 'Untracked event: dir::{event}'
+               print 'Untracked event: {event}'
 
    exit{@, dir} =
       if @_watcher:
          @_watcher.unwatch{@path}
 }
-

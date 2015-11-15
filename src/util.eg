@@ -44,10 +44,11 @@ task-cache = {=}
 
 task-function{f, transform = null} =
    eager-async f2{*args} =
-      try:
-         await f.apply{this, args}
-      catch e:
-         e
+      await f.apply{this, args}
+      ;; try:
+      ;;    await f.apply{this, args}
+      ;; catch e:
+      ;;    e
    m = [task-cache[f.to-string{}] or= new Map{}]
    match m.get{transform}:
       undefined? and match is transform ->

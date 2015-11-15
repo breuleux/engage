@@ -2,8 +2,11 @@
 require:
    quasar ->
       cached-function, State, Function
+   .fs ->
+      FileIterator, FileSystem
    .directory ->
-      FileIterator, FileSystem, Directory
+      ;; FileIterator, FileSystem, Directory
+      Directory
    .file ->
       File
    .output ->
@@ -40,10 +43,15 @@ class Engage:
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
       @reac = Function{@state, @main-task, {clobber-patch = false}}
+      @reac.on{.error, e -> @err{e}}
       @reac.sync{-> @act{}}
    async act{} =
-      results = await @reac.get{}
-      commit-all{results, @options}
+      v = await @reac.get{} ;; ???
+      commit-all{v, @options}
+   async err{e} =
+      @options.error{"An error occurred!!"}
+      @options.error{e.stack}
+
 
 globals: exports
 exports and module.exports = Engage
