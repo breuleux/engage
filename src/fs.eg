@@ -384,13 +384,13 @@ register{FSNode.prototype} with {
             match when p === "" ->
                .add ->
                   @_watcher.add{@path}
-                  prox.type = .file
+                  s.transact with -> prox.type = .file
                .add-dir ->
                   @_watcher.add{@path}
-                  prox.type = .directory
+                  s.transact with -> prox.type = .directory
                .unlink or .unlink-dir ->
                   @_watcher.unwatch{@path}
-                  prox.type = null
+                  s.transact with -> prox.type = null
                .change ->
                   s.transact with -> prox.__touch{}
                else ->
@@ -398,8 +398,9 @@ register{FSNode.prototype} with {
             .add ->
                s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
             .add-dir ->
-               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
-               prox.__touch-directory{}
+               s.transact with ->
+                  prox.set{p, dir.acquire{FSNode{fp}}}
+                  prox.__touch-directory{}
             .unlink or .unlink-dir ->
                s.transact with -> prox.delete{p}
             .change ->
