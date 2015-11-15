@@ -13,7 +13,7 @@ provide:
 ;; RENAMER ;;
 ;;;;;;;;;;;;;
 
-rename{var {path => p} or p, opts = {=}} =
+rename{arg and [var {path => p} or p], opts = {=}} =
    rebase = opts.rebase or [opts.from and {opts.from => opts.to or ""}] or {=}
    items{rebase} each {from, to} ->
       rel = path.relative{from, p}
@@ -22,7 +22,9 @@ rename{var {path => p} or p, opts = {=}} =
          break
    if opts.extension:
       p = p.replace{R"\.[a-zA-Z0-9]+$", opts.extension}
-   p
+   match arg:
+      String? -> p
+      else -> arg.fs.get{p}
 
 class _Renamer:
    constructor{@options = {=}} =

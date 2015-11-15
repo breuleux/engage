@@ -13,6 +13,7 @@ require:
    fs
    chokidar
    minimatch
+   filendir
 
 provide:
    FileIterator
@@ -80,7 +81,7 @@ class FileSystem:
    get{p} =
       match @directory-cache[p]:
          undefined? ->
-            entry = FSNode{p}
+            entry = FSNode{p, @}
             expr-value @directory-cache[p] =
                match @[DIRECTORY]:
                   undefined? ->
@@ -116,7 +117,8 @@ class FileSystemProxy < FileSystem:
 
 class FSNode:
 
-   constructor{@path, @last-time = Date{}} =
+   constructor{@path, @fs} =
+      @last-time = Date{}
       @_files = null
       try:
          stat = fs.lstat-sync{@path}
@@ -153,6 +155,9 @@ class FSNode:
       else:
          throw E.engage.read{'read: {@path} is not a file'}
 
+   write{contents} =
+      filendir.write-file-sync{@path, contents}
+
    ;;;;;;;;;;;;;;;;;;;
    ;; DIR INTERFACE ;;
    ;;;;;;;;;;;;;;;;;;;
@@ -164,11 +169,11 @@ class FSNode:
             undefined? ->
                fs.readdir-sync{@path} each filename ->
                   full-path = path.join{@path, filename}
-                  @_files[filename] = FSNode{full-path}
+                  @_files[filename] = FSNode{full-path, @fs}
             dir ->
                fs.readdir-sync{@path} each filename ->
                   full-path = path.join{@path, filename}
-                  @_files[filename] = dir.acquire{FSNode{full-path}}
+                  @_files[filename] = dir.acquire{FSNode{full-path, @fs}}
          @_files
       else:
          @_files
@@ -236,6 +241,7 @@ Object.define-property{FSNode.prototype, .text} with {
 class FSNodeProxy < FSNode:
 
    constructor{@path, obj, tracks, patch} =
+      @fs = obj.fs
       setup-proxy{@, obj, tracks, patch, FSNodeTrack}
 
    _prox{x} =
@@ -359,6 +365,7 @@ register{FSNode.prototype} with {
    serialize{value} =
       {"//type" => value.type
        "//path" => value.path
+       "//fs" => value.fs
        "//last-time" => value.last-time
        "//has-files" => Boolean{value._files}} &:
          object with items{value._files or {=}}
@@ -369,6 +376,7 @@ register{FSNode.prototype} with {
       items{fields} each {match k, v} ->
          "//type" -> fsn.type = v
          "//path" -> fsn.path = v
+         "//fs" -> fsn.fs = v
          "//last-time" -> fsn.last-time = v
          "//has-files" -> fsn._files = if{v, {=}, null}
          R"^//"? -> pass
@@ -399,10 +407,10 @@ register{FSNode.prototype} with {
                else ->
                   print 'Untracked event: {event}'
             .add ->
-               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
+               s.transact with -> prox.set{p, dir.acquire{FSNode{fp, @fs}}}
             .add-dir ->
                s.transact with ->
-                  prox.set{p, dir.acquire{FSNode{fp}}}
+                  prox.set{p, dir.acquire{FSNode{fp, @fs}}}
                   prox.touch-directory{}
             .unlink or .unlink-dir ->
                s.transact with -> prox.delete{p}
