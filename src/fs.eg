@@ -81,7 +81,7 @@ class FileSystem:
    get{p} =
       match @directory-cache[p]:
          undefined? ->
-            entry = FSNode{p, @}
+            entry = FSNode{p}
             expr-value @directory-cache[p] =
                match @[DIRECTORY]:
                   undefined? ->
@@ -117,7 +117,7 @@ class FileSystemProxy < FileSystem:
 
 class FSNode:
 
-   constructor{@path, @fs} =
+   constructor{@path} =
       @last-time = Date{}
       @_files = null
       try:
@@ -139,6 +139,9 @@ class FSNode:
    stat{} =
       @last-time
       fs.lstat-sync{@path}
+
+   root{} =
+      @[DIRECTORY]??[symbols.associated-state]??.get{}
 
    ;; touch{} =
    ;;    @last-time = Date{}
@@ -169,11 +172,11 @@ class FSNode:
             undefined? ->
                fs.readdir-sync{@path} each filename ->
                   full-path = path.join{@path, filename}
-                  @_files[filename] = FSNode{full-path, @fs}
+                  @_files[filename] = FSNode{full-path}
             dir ->
                fs.readdir-sync{@path} each filename ->
                   full-path = path.join{@path, filename}
-                  @_files[filename] = dir.acquire{FSNode{full-path, @fs}}
+                  @_files[filename] = dir.acquire{FSNode{full-path}}
          @_files
       else:
          @_files
@@ -241,7 +244,6 @@ Object.define-property{FSNode.prototype, .text} with {
 class FSNodeProxy < FSNode:
 
    constructor{@path, obj, tracks, patch} =
-      @fs = obj.fs
       setup-proxy{@, obj, tracks, patch, FSNodeTrack}
 
    _prox{x} =
@@ -254,6 +256,9 @@ class FSNodeProxy < FSNode:
    touch-directory{} =
       @[symbols.register-patch]{"//directories"} with
          #update{true}
+
+   root{} =
+      @[symbols.obj]??[DIRECTORY]??[symbols.associated-state]??.get{}
 
    find{glob} =
       gen g{} =
@@ -407,10 +412,10 @@ register{FSNode.prototype} with {
                else ->
                   print 'Untracked event: {event}'
             .add ->
-               s.transact with -> prox.set{p, dir.acquire{FSNode{fp, @fs}}}
+               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
             .add-dir ->
                s.transact with ->
-                  prox.set{p, dir.acquire{FSNode{fp, @fs}}}
+                  prox.set{p, dir.acquire{FSNode{fp}}}
                   prox.touch-directory{}
             .unlink or .unlink-dir ->
                s.transact with -> prox.delete{p}
