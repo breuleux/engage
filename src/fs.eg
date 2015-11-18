@@ -273,7 +273,9 @@ class FSNodeProxy < FSNode:
 
             {orig and minimatch.make-re! x, *rest} ->
                @[symbols.register-tracks]{'//:{orig}'}
-               @entries{} each
+               entries = @[symbols.obj].entries{} each {k, v} ->
+                  {k, proxy{v, @[symbols.tracks], @[symbols.patch]}}
+               entries each
                   {x? name, entry} ->
                      if rest == {}:
                         yield entry
