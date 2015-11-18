@@ -4,11 +4,6 @@ require:
       cached-function, State, Function
    .fs ->
       FileIterator, FileSystem
-   .directory ->
-      ;; FileIterator, FileSystem, Directory
-      Directory
-   .file ->
-      File
    .output ->
       Write, Delete, commit-all
    .util ->
@@ -20,7 +15,7 @@ require:
 provide:
    cached-function
    task-function
-   FileIterator, FileSystem, Directory, File
+   FileIterator, FileSystem
    rename, Renamer
    Write, Delete, commit-all
    Engage
