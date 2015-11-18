@@ -109,14 +109,14 @@ var tCat = engage.task(function(root) {
     dest.write(filesContents.join(""));
 });
 
-var tMain = task(function () {
+var tMain = engage.task(function () {
     var root = this.get(this.rootPath);
     tCat(root.get("partsA"));
     tCat(root.get("partsB"));
 });
 
 opts = {
-    renameOut: Renamer({from: rootPath, to: outPath}),
+    renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
     outPath: outPath
 };
