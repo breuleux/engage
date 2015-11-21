@@ -9,6 +9,7 @@ require:
    .util ->
       rename, Renamer
       task-function
+      Logger, EngageMessage
    lodash
    path
 
@@ -16,6 +17,7 @@ provide:
    cached-function
    task-function
    FileIterator, FileSystem
+   Logger, EngageMessage, log, minilog
    rename, Renamer
    Write, Delete, commit-all
    Engage
@@ -27,12 +29,19 @@ debounce{delay}{f} =
    lodash.debounce{f, delay}
 
 
+log = Logger{}.log
+minilog = Logger{false}.log
+
+defaults = {
+   debounce = 25
+   log = log
+   error = console.error
+}
+
 class Engage:
    constructor{@main-task, @options = {=}} =
-      @options.debounce or= 25
-      @options.log or= console.log
-      @options.error or= console.error
-      @options.rename or= Renamer{@options}
+      @options = defaults & @options
+
    run{} =
       @state = State{FileSystem{@options}, commit-policy = null}
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =

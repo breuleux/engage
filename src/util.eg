@@ -3,10 +3,13 @@ require:
    path
    quasar ->
       cached-function
+   chalk
 
 provide:
    rename, Renamer
    task-function
+   EngageMessage
+   Logger
 
 
 ;;;;;;;;;;;;;
@@ -38,15 +41,61 @@ Renamer{options} =
 
 
 
+;;;;;;;;;;;;;
+;; LOGGING ;;
+;;;;;;;;;;;;;
+
+class EngageMessage:
+   constructor{@type, @task-name, @arguments} =
+      pass
+   to-string{} =
+      '{chalk.cyan{@type}} {@task-name}'
+   inspect{} =
+      '{chalk.cyan{@type}} {@task-name}'
+
+;;;;;;;;;;;;
+;; LOGGER ;;
+;;;;;;;;;;;;
+
+class Logger:
+   constructor{@log-tasks = true} =
+      @indent = 0
+   write-line{x} =
+      print [1 .. @indent each i -> ""].join{" "} + String{x}
+   _log{match message} =
+      EngageMessage? {type => match} ->
+         when not @log-tasks ->
+            @write-line{message}
+         .end ->
+            @indent -= 2
+            @write-line{message}
+         else ->
+            @write-line{message}
+            @indent += 2
+      else ->
+         @write-line{message}
+
+Object.define-property{Logger.prototype, .log} with {
+   method get{} = @_log.bind{@}
+}
+
 ;;;;;;;;;;;;;;;;
 ;; TASK CACHE ;;
 ;;;;;;;;;;;;;;;;
 
 task-cache = {=}
 
-task-function{f, transform = null} =
+task-function{*match} =
+   {String? name, fn} ->
+      _task-function{fn, null, name}
+   {fn} ->
+      _task-function{fn, null, ""}
+
+_task-function{f, transform = null, name = ""} =
    eager-async f2{*args} =
+      this.log{EngageMessage{"begin", name, args}}
       await f.apply{this, args}
+      this.log{EngageMessage{"end", name, args}}
       ;; try:
       ;;    await f.apply{this, args}
       ;; catch e:
