@@ -5,8 +5,8 @@ var engage = require("../src");
 var rootPath = "./content";
 var outPath = "./out";
 
-var tCat = engage.task(function(root) {
-    var filesContents = root.find("**/*.cat").map(function (file) {
+var tCat = engage.task("cat", function(root) {
+    var filesContents = root.find("**/*.cat").mapTask(function (file) {
         this.log("Read " + file.path);
         return file.text;
     });
@@ -15,7 +15,7 @@ var tCat = engage.task(function(root) {
     dest.write(filesContents.join(""));
 });
 
-var tMain = engage.task(function () {
+var tMain = engage.task("main", function () {
     var root = this.get(this.rootPath);
     tCat(root.get("partsA"));
     tCat(root.get("partsB"));

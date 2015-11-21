@@ -6,8 +6,8 @@ var marked = require("marked");
 var rootPath = "./content";
 var outPath = "./out";
 
-var tMarkdown = engage.task(function () {
-    this.get(this.rootPath).find("**/*.md").map(function (file) {
+var tMarkdown = engage.task("markdown", function () {
+    this.get(this.rootPath).find("**/*.md").mapTask(function (file) {
         destination = this.renameOut(file, {extension: ".html"});
         this.log("Writing file: " + destination.path);
         destination.write(marked(file.text));
@@ -17,8 +17,7 @@ var tMarkdown = engage.task(function () {
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
-    outPath: outPath,
-    log: console.log
+    outPath: outPath
 };
 
 engage(tMarkdown, opts).run();
