@@ -64,16 +64,17 @@ exports and module.exports = Engage
 macro{task-function} task-macro{expr} =
    let {"task-function" => tfn} = @deps
    {it, self} = @mark{`@`, `self`}
+   expr as [#send{#symbol{name}, _} or name is ""]
    @multimacro with {
       project{match expr} =
          `_lambda{^args, ^pre, ^body, ^post, ^gen}` ->
             ```
-            [^tfn] with eager-async with
+            [^tfn]{^=name} with eager-async with
                _lambda{^args, ^pre, [let ^it and ^self = this, ^body], ^post, ^gen}
             ```
          `^args -> ^body` ->
             ```
-            [^tfn] with eager-async with
+            [^tfn]{^=name} with eager-async with
                ^args ->
                   let ^it and ^self = this
                   ^body
