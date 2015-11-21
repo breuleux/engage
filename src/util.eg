@@ -46,26 +46,33 @@ Renamer{options} =
 ;;;;;;;;;;;;;
 
 class EngageMessage:
-   constructor{@type, @task-name, @arguments} =
+   constructor{@type, @task-name, @arguments, @time = ""} =
       pass
    to-string{} =
-      '{chalk.cyan{@type}} {@task-name}'
+      xs = {
+         chalk.cyan{@type}
+         chalk.yellow{@task-name}
+         chalk.grey{@time and String{@time} + "ms"}
+      }
+      [xs each x when x -> x].join{" "}
    inspect{} =
-      '{chalk.cyan{@type}} {@task-name}'
+      @to-string{}
 
-;;;;;;;;;;;;
-;; LOGGER ;;
-;;;;;;;;;;;;
-
-class Logger:
+class _Logger:
    constructor{@log-tasks = true} =
       @indent = 0
-   write-line{x} =
-      print [1 .. @indent each i -> ""].join{" "} + String{x}
-   _log{match message} =
+      @newline = true
+   write{String! x} =
+      if @newline:
+         process.stdout.write{[1 .. @indent each i -> ""].join{" "}}
+      process.stdout.write{x}
+      @newline = true ;;x.ends-with{"\n"}
+   write-line{String! x} =
+      @write{x + "\n"}
+   log{match message} =
       EngageMessage? {type => match} ->
          when not @log-tasks ->
-            @write-line{message}
+            pass
          .end ->
             @indent -= 2
             @write-line{message}
@@ -75,9 +82,10 @@ class Logger:
       else ->
          @write-line{message}
 
-Object.define-property{Logger.prototype, .log} with {
-   method get{} = @_log.bind{@}
-}
+Logger{*args} =
+   l = _Logger{*args}
+   l.log.bind{l} &: {without-newline{x} = l.write{x}}
+
 
 ;;;;;;;;;;;;;;;;
 ;; TASK CACHE ;;
@@ -94,8 +102,11 @@ task-function{*match} =
 _task-function{f, transform = null, name = ""} =
    eager-async f2{*args} =
       this.log{EngageMessage{"begin", name, args}}
-      await f.apply{this, args}
-      this.log{EngageMessage{"end", name, args}}
+      start-time = new Date{}.value-of{}
+      result = await f.apply{this, args}
+      end-time = new Date{}.value-of{}
+      this.log{EngageMessage{"end", name, args, end-time - start-time}}
+      result
       ;; try:
       ;;    await f.apply{this, args}
       ;; catch e:

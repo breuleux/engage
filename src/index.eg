@@ -29,8 +29,8 @@ debounce{delay}{f} =
    lodash.debounce{f, delay}
 
 
-log = Logger{}.log
-minilog = Logger{false}.log
+log = Logger{}
+minilog = Logger{false}
 
 defaults = {
    debounce = 25
@@ -92,6 +92,6 @@ macro{task-function} [each!]{#data{expr, body}} =
    ```
    eager-async rawf{x} = match x: ^body
    f = [^tfn]{rawf}
-   await all [^expr each x -> f{x}]
+   ^expr each x -> await f{x}
    ```
 
