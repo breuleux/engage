@@ -50,8 +50,16 @@ class FileIterator:
             yield x
          @results = results
    map{fn} =
+      [@] each x -> fn{x}
+   map-task{fn} =
       t = task-function{fn}
       [@] each x -> t{x}
+   for-each{fn} =
+      @map{fn}
+      null
+   for-each-task{fn} =
+      @map-task{fn}
+      null
    ;; map-file{options = {=}, fn} =
    ;;    t = task-function{fn, extract-text-transformer}
    ;;    [@] each file -> t{file, {=} & options}
@@ -140,6 +148,9 @@ class FSNode:
    stat{} =
       @mtime
       fs.lstat-sync{@path}
+
+   exists{} =
+      @type !== null
 
    older{other} =
       @mtime.value-of{} < other.mtime.value-of{}
@@ -258,7 +269,7 @@ class FSNodeProxy < FSNode:
 
    touch{} =
       @[symbols.register-patch]{"//mtime"} with
-         #update{Date{}}
+         #update{new Date{}}
 
    touch-directory{} =
       @[symbols.register-patch]{"//directories"} with
