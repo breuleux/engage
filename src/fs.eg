@@ -3,6 +3,7 @@ require:
    quasar ->
       ID, DIRECTORY, symbols
       setup-proxy, deprox, proxy
+      current-frame
       current-context
       register
    .output ->
@@ -177,6 +178,7 @@ class FSNode:
          throw E.engage.read{'read: {@path} is not a file'}
 
    write{contents} =
+      current-frame{}??.effects??.add{@path}
       filendir.write-file-sync{@path, contents}
 
    ;;;;;;;;;;;;;;;;;;;
