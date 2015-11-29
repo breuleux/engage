@@ -9,6 +9,7 @@ provide:
    rename, Renamer
    task-function
    EngageMessage
+   ErrorMessage
    Logger
 
 
@@ -58,6 +59,12 @@ class EngageMessage:
    inspect{} =
       @to-string{}
 
+class ErrorMessage < EngageMessage:
+   constructor{@error} =
+      pass
+   to-string{} =
+      chalk.red{'ERROR: {@error.message}'}
+
 class _Logger:
    constructor{@log-tasks = true} =
       @indent = 0
@@ -103,14 +110,22 @@ _task-function{f, transform = null, name = ""} =
    eager-async f2{*args} =
       this.log{EngageMessage{"begin", name, args}}
       start-time = new Date{}.value-of{}
-      result = await f.apply{this, args}
-      end-time = new Date{}.value-of{}
-      this.log{EngageMessage{"end", name, args, end-time - start-time}}
-      result
-      ;; try:
-      ;;    await f.apply{this, args}
-      ;; catch e:
-      ;;    e
+      try:
+         result = await f.apply{this, args}
+      catch e:
+         if not e._engage-logged:
+            this.log{ErrorMessage{e}}
+            e._engage-logged = true
+         throw e
+      finally:
+         end-time = new Date{}.value-of{}
+         this.log{EngageMessage{"end", name, args, end-time - start-time}}
+         result
+
+         ;; try:
+         ;;    await f.apply{this, args}
+         ;; catch e:
+         ;;    e
    m = [task-cache[f.to-string{}] or= new Map{}]
    match m.get{transform}:
       undefined? and match is transform ->
