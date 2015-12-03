@@ -1,30 +1,32 @@
-require("earlgrey/register");
 
-var engage = require("../src");
+var engage = require("../../lib");
 
 var rootPath = "./content";
 var outPath = "./out";
 
+var tRead = engage.task("read", function (file) {
+    this.log("Read " + file.path);
+    return file.text;
+});
+
 var tCat = engage.task("cat", function(root) {
-    var filesContents = root.find("**/*.cat").mapTask(function (file) {
-        this.log("Read " + file.path);
-        return file.text;
-    });
+    if (root.type !== "directory")
+        return
+    var filesContents = root.find("**/*.cat").map(tRead);
     var dest = this.renameOut(root);
     this.log("Write " + dest.path);
     dest.write(filesContents.join(""));
 });
 
-var tMain = engage.task("main", function () {
-    var root = this.get(this.rootPath);
-    tCat(root.get("partsA"));
-    tCat(root.get("partsB"));
+var tMain = engage.task("main", function (root) {
+    root.forEach(tCat);
 });
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
-    outPath: outPath
+    outPath: outPath,
+    clean: true
 };
 
 engage(tMain, opts).run();
