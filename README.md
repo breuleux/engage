@@ -2,7 +2,8 @@
 engage
 ======
 
-Incremental build tool with automatic dependency tracking. Very alpha.
+Incremental build tool with automatic dependency tracking. Very alpha,
+so expect bugs (and expect me to fix them).
 
 
 Principles
@@ -18,17 +19,22 @@ Principles
   it.
 
 * **No frivolous plugins**: any function that operates a source to
-  source transform can just be used directly.
+  source transform should just be used directly.
 
 
 
 Examples
 --------
 
+The `examples/` directory gives several examples for various tasks you
+might want to undertake. You are welcome to take and adapt them.
+
+Here's a transcript of one of the examples:
+
 ### Compiling Markdown files
 
-Here is how you would compile all the `.md` files in `./content` to
-`.html` files in `./out`:
+Task: compile all the `.md` files in `./content` to `.html` files in
+`./out`:
 
 ```javascript
 var engage = require("engage");
@@ -37,42 +43,40 @@ var marked = require("marked");
 var rootPath = "./content";
 var outPath = "./out";
 
-var tMarkdown = engage.task(function () {
-    this.get(this.rootPath).find("**/*.md").map(function (file) {
-        destination = this.renameOut(file, {extension: ".html"});
-        this.log("Writing file: " + destination.path);
-        destination.write(marked(file.text));
-    });
+var tMarkdown = engage.task(function (file) {
+    var destination = this.renameOut(file, {extension: ".html"});
+    this.log("Writing file: " + destination.path);
+    destination.write(marked(file.text));
+});
+
+var tAllMarkdown = engage.task(function (root) {
+    root.find("**/*.md").forEach(tMarkdown);
 });
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
     outPath: outPath,
-    log: console.log
+    clean: true
 };
 
-engage(tMarkdown, opts).run();
+engage(tAllMarkdown, opts).run();
 ```
 
-And here's what you gain:
-
-* `engage.task` and `map` track all reads and all file changes so that
+* `engage.task` and `mapTask` track all reads and all file changes so that
   work can be minimized:
   * Modify a `.md` file and only that file will be recompiled.
   * Add a `.md` file and it will be compiled along the others.
-  * You can create new directories, add `.md` files in them, etc.
+  * Adding, moving and deleting files and directories will work as
+    expected.
 
 * There is no `engage-marked` package. There is no need for one. The
   `marked` function takes a string and returns a string and that's all
   you need. Now you can take this code and adapt it to any compiler!
   No need to wait for someone else to do it for you!
-  * Things *do* get more complicated if a compiler reads dependencies,
-    because if you want `engage` to track them, you need `engage` to
-    resolve them.
 
-* Deriving the output file from the source file is made super easy by
-  the `Renamer` class:
+* Deriving the output file from the source file is made easy by the
+  `Renamer` class:
   * `Renamer({from: "abc", to: "xyz"})` swaps the "abc" base for "xyz".
   * `Renamer({rebase: {"abc": "xyz"}})` does the same thing, but you can
     define more than one rebase.
@@ -81,67 +85,15 @@ And here's what you gain:
     method.
   * *You* define your renamer.
 
-Also note that logging is your responsibility. You can use whatever
-logger you want (`console.log` is the default).
-  
+* The `rootPath` option determines what the main task (`tAllMarkdown`
+  in the example) receives in its `root` argument. Note that this is
+  equivalent to `root = this.get(this.rootPath)`. You can use
+  `this.get` to open any file on the filesystem, if needed.
 
-### Concatenation
-
-This task demonstrates concatenation of many files (more specifically,
-`contents/root/**/*.cat` will be concatenated and saved as a file with
-the same name as the directory; in this case that would be
-`out/root`). The boilerplate is almost identical to the previous
-example, so focus mainly on `tCat` and `tMain`.
-
-```javascript
-var engage = require("engage");
-
-var rootPath = "./content";
-var outPath = "./out";
-
-var tCat = engage.task(function(root) {
-    var filesContents = root.find("**/*.cat").map(function (file) {
-        this.log("Read " + file.path);
-        return file.text;
-    });
-    var dest = this.renameOut(root);
-    this.log("Write " + dest.path);
-    dest.write(filesContents.join(""));
-});
-
-var tMain = engage.task(function () {
-    var root = this.get(this.rootPath);
-    tCat(root.get("partsA"));
-    tCat(root.get("partsB"));
-});
-
-opts = {
-    renameOut: engage.Renamer({from: rootPath, to: outPath}),
-    rootPath: rootPath,
-    outPath: outPath
-};
-
-engage(tMain, opts).run();
-```
-
-There are a few additional features demonstrated:
-
-* We can use `map` to build our array of strings to concatenate. But
-  beware: mutation and side-effects should **not** be used in the
-  function you give to `map`.
-
-* Because of the use of `map`, if you change one of the files that are
-  being concatenated, `engage` will only re-read that file. This is
-  not very interesting in this case because reading a file is very
-  cheap, but if the task was more expensive, it would cache and re-use
-  the result.
-
-* Adding and removing `.cat` files will redo the concatenation -- as
-  you would expect.
-
-* The task `tCat` is called by the task `tMain` twice. This is how you
-  compose tasks, and it will work exactly as expected.
-
+* The `clean` option instructs engage to delete previously generated
+  files if they are not part of the output any more. engage will only
+  delete files that have been written by a task. The default value for
+  this option is `false`.
 
 
 Tasks
@@ -149,10 +101,7 @@ Tasks
 
 ### Definition
 
-A *task* is any function wrapped in a call to:
-
-* `engage.task(__task__)`
-* `find(...).map(__task__)`
+A *task* is any function wrapped in a call to `engage.task`.
 
 A task is the granularity at which engage operates: engage tracks
 every file every task reads, and when one of them is modified, the
@@ -165,16 +114,27 @@ better.
 
 ### Discipline
 
+**IMPORTANT**
+
 In order for a task to work properly there are a few rules to follow:
 
-* A task must execute synchronously.
+* A task must execute **synchronously**.
 
 * The *only* side-effects a task should have are writing to the
-  filesystem or logging. That's what `engage` is built to handle. This
-  being said: do **not** mutate data in a task: do *not* modify fields
-  in objects, do *not* push data in arrays, and so on. I'm not saying
-  it *won't* work, but with all the re-executing and caching of tasks
-  there are a lot of things that could go wrong.
+  filesystem using the `write` method on engage's `FSNode` objects
+  (see examples) or logging. That's what `engage` is built to
+  handle. Do **not** mutate data in a task:
+  * Do *not* modify fields in objects
+  * Do *not* push data in arrays
+  * Do *not* use data that may be modified by another part of the code
+  * I'm not saying doing these things *won't* work, but with all the
+    re-executing and caching of tasks there are a lot of things that
+    could go wrong.
+
+* **Do not nest tasks.** I mean... technically, you can... but you
+  will run into strange issues if you don't know the finer points of
+  how engage works. For now, I simply recommend not doing it at
+  all. Define every task in module or global scope.
 
 
 
@@ -182,12 +142,6 @@ Limitations
 -----------
 
 Here's what `engage` **will not do**:
-
-* In most cases, removing a file will *not* clean up the output. For
-  instance, if you compile `xyz.foo` into `xyz.bar` and delete
-  `xyz.foo`, `xyz.bar` will remain behind. It would be a bit tricky to
-  make a cleaning task at the moment, although you can always do it
-  the old-fashioned way (and by old-fashioned way I mean `rm -rf`).
 
 * `engage` *cannot* run tasks asynchronously because of the way it
   tracks what tasks change what parts of the filesystem (async will
@@ -197,6 +151,9 @@ Here's what `engage` **will not do**:
 * `engage` will restart the generation anew on every execution. I am
   planning to add a caching system (opt-in) so that builds can be
   incremental from an execution to the next.
+  * For now, you can call `destination.older(source)` to check if a
+    source file was modified after it was last compiled, and then only
+    recompile it if that's the case. Works well in many use cases.
 
 Be aware of these limitations and choose your tools
 consequently. Incremental builds are usually pretty efficient and
@@ -219,26 +176,14 @@ require:
 
 require-macros:
    engage -> task
-    
-task t-cat(root) =
-   results = root.find("**/*.cat").map with file ->
-      @log('Reading {file.path}')
-      file.text
-   dest = @rename(root)
-   @log('Write {dest.path}')
-   dest.write(results.join(""))
 
-task t-markdown(root) =
-   root.find("**/*.md").map with file ->
-      dest = @rename(file, extension = ".html")
-      @log('Compile {file.path} -> {dest.path}')
-      dest.write(marked(file.text))
+task t-markdown(file) =
+   dest = @rename(file, extension = ".html")
+   @log('Compile {file.path} -> {dest.path}')
+   dest.write(marked(file.text))
 
-task t-main() =
-   root = @get(@root-path)
-   t-cat(root.get("partsA"))
-   t-cat(root.get("partsB"))
-   t-markdown(root)
+task t-markdown-all(root) =
+   root.find("**/*.md").for-each(t-markdown)
 
 root-path = "./content"
 out-path = "./out"
@@ -248,7 +193,8 @@ opts = {
     rename = Renamer(from = root-path, to = out-path)
     root-path = root-path
     out-path = out-path
+    clean = true
 }
 
-engage(t-main, opts).run()
+engage(t-markdown-all, opts).run()
 ```
