@@ -9,7 +9,7 @@ provide:
    rename, Renamer
    task-function
    EngageMessage
-   ErrorMessage
+   ;; ErrorMessage
    Logger
 
 
@@ -47,23 +47,37 @@ Renamer{options} =
 ;;;;;;;;;;;;;
 
 class EngageMessage:
-   constructor{@type, @task-name, @arguments, @time = ""} =
+   constructor{@type, *[@arguments]} =
       pass
    to-string{} =
-      xs = {
-         chalk.cyan{@type}
-         chalk.yellow{@task-name}
-         chalk.grey{@time and String{@time} + "ms"}
-      }
-      [xs each x when x -> x].join{" "}
+      match @type:
+         .begin or .end ->
+            {task-name, _, time = ""} = @arguments
+            xs = {
+               chalk.cyan{@type}
+               chalk.yellow{task-name}
+               chalk.grey{if{Number? time, String{time} + "ms", ""}}
+            }
+            [xs each x when x -> x].join{" "}
+         .error ->
+            {error} = @arguments
+            chalk.red{'ERROR: {error.message}'}
+         .add-file ->
+            chalk.green{'+ {@arguments[0]}'}
+         .remove-file ->
+            chalk.red{'- {@arguments[0]}'}
+         .change-file ->
+            chalk.yellow{'M {@arguments[0]}'}
+         else ->
+            '{@type}({@arguments.join{", "}})'
    inspect{} =
       @to-string{}
 
-class ErrorMessage < EngageMessage:
-   constructor{@error} =
-      pass
-   to-string{} =
-      chalk.red{'ERROR: {@error.message}'}
+;; class ErrorMessage < EngageMessage:
+;;    constructor{@error} =
+;;       pass
+;;    to-string{} =
+;;       chalk.red{'ERROR: {@error.message}'}
 
 class _Logger:
    constructor{@log-tasks = true} =
@@ -80,12 +94,14 @@ class _Logger:
       EngageMessage? {type => match} ->
          when not @log-tasks ->
             pass
+         .begin ->
+            @write-line{message}
+            @indent += 2
          .end ->
             @indent -= 2
             @write-line{message}
          else ->
             @write-line{message}
-            @indent += 2
       else ->
          @write-line{message}
 
@@ -114,7 +130,7 @@ _task-function{f, transform = null, name = ""} =
          result = await f.apply{this, args}
       catch e:
          if not e._engage-logged:
-            this.log{ErrorMessage{e}}
+            this.log{EngageMessage{.error, e}}
             e._engage-logged = true
          throw e
       finally:

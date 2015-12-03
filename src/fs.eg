@@ -244,6 +244,9 @@ class FSNode:
    entries{} =
       keys{@get-files{}} each k -> {k, @get{k}}
 
+   map{f} = @find{"*"}.map{f}
+   for-each{f} = @find{"*"}.for-each{f}
+
    gen [^Symbol.iterator]{} =
       @entries{} each {k, v} -> yield v
 
@@ -415,32 +418,46 @@ register{FSNode.prototype} with {
    enter{@, dir} =
       s = dir[symbols.associated-state]
       prox = s.model{@}
+      @_watching = true
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
          {match event, fp and p >> path.relative{@path, p}} ->
             ;; do:
-            ;;    print {event, fp, p}
+            ;;    print {event, @path, p, @_watching}
+            when not @_watching ->
+               ;; unwatch will not dequeue pending events,
+               ;; so we need to use the @_watching flag to ignore them
+               return
             match when p === "" ->
                .add ->
+                  @_watching = true
                   @_watcher.add{@path}
                   s.transact with -> prox.type = .file
                .add-dir ->
+                  @_watching = true
                   @_watcher.add{@path}
                   s.transact with -> prox.type = .directory
                .unlink or .unlink-dir ->
                   @_watcher.unwatch{@path}
+                  @_watching = false
                   s.transact with -> prox.type = null
                .change ->
+                  @_watching = true
+                  @_watcher.add{@path}
                   s.transact with -> prox.touch{}
                else ->
                   print 'Untracked event: {event}'
+            when not @_files ->
+               return
             .add ->
-               s.transact with -> prox.set{p, dir.acquire{FSNode{fp}}}
+               s.transact with ->
+                  prox.set{p, dir.acquire{FSNode{fp}}}
             .add-dir ->
                s.transact with ->
                   prox.set{p, dir.acquire{FSNode{fp}}}
                   prox.touch-directory{}
             .unlink or .unlink-dir ->
-               s.transact with -> prox.delete{p}
+               s.transact with ->
+                  prox.delete{p}
             .change ->
                pass
             else ->

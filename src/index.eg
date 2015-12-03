@@ -2,7 +2,7 @@
 require:
    quasar ->
       cached-function, State, Function
-   .fs ->
+   "./fs" ->
       FileIterator, FileSystem
    .output ->
       Write, Delete, commit-all
@@ -13,6 +13,7 @@ require:
    lodash
    path
    chalk
+   fs
 
 provide:
    cached-function
@@ -39,8 +40,18 @@ defaults = {
    error = console.error
 }
 
+
+meta-task{main-task} =
+   cached-function{f} where method f{} =
+      if @root-path:
+         main-task{@get{@root-path}}
+      else:
+         main-task{null}
+
+
 class Engage:
-   constructor{@main-task, @options = {=}} =
+   constructor{main-task, @options = {=}} =
+      @main-task = meta-task{main-task}
       @options = defaults & @options
       @last-effects = new Set{}
 
@@ -52,17 +63,22 @@ class Engage:
       @reac.on{.error, e -> @err{e}}
       @reac.sync{-> @act{}}
       @reac.sync-effects{e -> @effects{e}}
+
    async act{} =
       v = await @reac.get{} ;; ???
       commit-all{v, @options}
+
    async effects{new-effects} =
       new-effects each effect ->
          if not @last-effects.has{effect}:
-            @options.log{chalk.green{'+ {effect}'}}
-      @last-effects each effect ->
-         if not new-effects.has{effect}:
-            @options.log{chalk.red{'- {effect}'}}
+            @options.log{EngageMessage{.add-file, effect}}
+      if @options.clean:
+         @last-effects each effect ->
+            if not new-effects.has{effect}:
+               fs.unlink-sync{effect}
+               @options.log{EngageMessage{.remove-file, effect}}
       @last-effects = new-effects
+
    async err{e} =
       @options.error{"An error occurred."}
       @options.error{e.stack}
