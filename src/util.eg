@@ -9,7 +9,6 @@ provide:
    rename, Renamer
    task-function
    EngageMessage
-   ;; ErrorMessage
    Logger
 
 
@@ -49,55 +48,73 @@ Renamer{options} =
 class EngageMessage:
    constructor{@type, *[@arguments]} =
       pass
+   to-string-terse{} =
+      match @type:
+         .end or .end-cache ->
+            {task-name, _, time = ""} = @arguments
+            '{chalk.cyan{"end"}} {chalk.grey{if{Number? time, String{time} + "ms", ""}}}'
    to-string{} =
       match @type:
-         .begin or .end ->
+         .begin or .end or .begin-cache or .end-cache ->
             {task-name, _, time = ""} = @arguments
             xs = {
-               chalk.cyan{@type}
+               chalk.cyan{@type.replace{"C", " c"}}
                chalk.yellow{task-name}
                chalk.grey{if{Number? time, String{time} + "ms", ""}}
             }
             [xs each x when x -> x].join{" "}
+         ;; .begin-cache or .end-cache ->
+         ;;    {name} = @arguments
+         ;;    '{chalk.cyan{"use cache"}} {chalk.yellow{name}}'
+         .effect ->
+            {name} = @arguments
+            chalk.green{'Writing {name}'}
          .error ->
             {error} = @arguments
             chalk.red{'ERROR: {error.message}'}
+         .read-file ->
+            'R {@arguments[0]}'
          .add-file ->
             chalk.green{'+ {@arguments[0]}'}
          .remove-file ->
             chalk.red{'- {@arguments[0]}'}
          .change-file ->
-            chalk.yellow{'M {@arguments[0]}'}
+            chalk.green{'M {@arguments[0]}'}
          else ->
             '{@type}({@arguments.join{", "}})'
    inspect{} =
       @to-string{}
 
-;; class ErrorMessage < EngageMessage:
-;;    constructor{@error} =
-;;       pass
-;;    to-string{} =
-;;       chalk.red{'ERROR: {@error.message}'}
-
 class _Logger:
    constructor{@log-tasks = true} =
       @indent = 0
       @newline = true
+      @dangling = false
    write{String! x} =
       if @newline:
-         process.stdout.write{[1 .. @indent each i -> ""].join{" "}}
+         process.stdout.write{[0 .. @indent each i -> ""].join{" "}}
       process.stdout.write{x}
-      @newline = true ;;x.ends-with{"\n"}
+      @newline = x.ends-with{"\n"}
    write-line{String! x} =
       @write{x + "\n"}
    log{match message} =
+      match when @dangling ->
+         do: @dangling = false
+         EngageMessage? {type => .end or .end-cache} ->
+            ;; @write-line{' {chalk.cyan{"end"}}'}
+            @write-line{" " + message.to-string-terse{}}
+            @indent -= 2
+         else ->
+            @write-line{""}
+            @log{message}
       EngageMessage? {type => match} ->
          when not @log-tasks ->
             pass
-         .begin ->
-            @write-line{message}
+         .begin or .begin-cache ->
+            @write{message}
+            @dangling = true
             @indent += 2
-         .end ->
+         .end or .end-cache ->
             @indent -= 2
             @write-line{message}
          else ->
@@ -123,25 +140,28 @@ task-function{*match} =
       _task-function{fn, null, ""}
 
 _task-function{f, transform = null, name = ""} =
-   eager-async f2{*args} =
-      this.log{EngageMessage{"begin", name, args}}
-      start-time = new Date{}.value-of{}
-      try:
-         result = await f.apply{this, args}
-      catch e:
-         if not e._engage-logged:
-            this.log{EngageMessage{.error, e}}
-            e._engage-logged = true
-         throw e
-      finally:
-         end-time = new Date{}.value-of{}
-         this.log{EngageMessage{"end", name, args, end-time - start-time}}
-         result
+   ;; eager-async f2{*args} =
+   ;;    ;; this.log{EngageMessage{"begin", name, args}}
+   ;;    ;; start-time = new Date{}.value-of{}
+   ;;    try:
+   ;;       result = await f.apply{this, args}
+   ;;    catch e:
+   ;;       ;; if not e._engage-logged:
+   ;;       ;;    this.log{EngageMessage{.error, e}}
+   ;;       ;;    e._engage-logged = true
+   ;;       throw e
+   ;;    finally:
+   ;;       ;; end-time = new Date{}.value-of{}
+   ;;       ;; this.log{EngageMessage{"end", name, args, end-time - start-time}}
+   ;;       result
 
-         ;; try:
-         ;;    await f.apply{this, args}
-         ;; catch e:
-         ;;    e
+   ;;       ;; try:
+   ;;       ;;    await f.apply{this, args}
+   ;;       ;; catch e:
+   ;;       ;;    e
+   ;; f2.engage-name = name
+   f2 = f
+   f.engage-name = name
    m = [task-cache[f.to-string{}] or= new Map{}]
    match m.get{transform}:
       undefined? and match is transform ->

@@ -5,6 +5,8 @@ require:
       setup-proxy, deprox, proxy
       current-frame
       current-context
+      side-effect
+      emit
       register
    .output ->
       read-from, Write
@@ -173,13 +175,13 @@ class FSNode:
       if @type === .file:
          @mtime
          read-from[@path] = true
+         emit{.read-file, @path}
          fs.read-file-sync{@path}
       else:
          throw E.engage.read{'read: {@path} is not a file'}
 
    write{contents} =
-      current-frame{}??.effects??.add{@path}
-      filendir.write-file-sync{@path, contents}
+      side-effect{#write{@path, contents}}
 
    ;;;;;;;;;;;;;;;;;;;
    ;; DIR INTERFACE ;;

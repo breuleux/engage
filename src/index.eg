@@ -14,6 +14,7 @@ require:
    path
    chalk
    fs
+   filendir
 
 provide:
    cached-function
@@ -41,25 +42,70 @@ defaults = {
 }
 
 
+TOP = "{{TOP}}"
 meta-task{main-task} =
-   cached-function{f} where method f{} =
+   method f{} =
       if @root-path:
          main-task{@get{@root-path}}
       else:
          main-task{null}
+   f.engage-name = TOP
+   cached-function{f}
 
+
+default-show = {
+   task = true
+   cache = false
+   read = true
+   write = true
+}
 
 class Engage:
+
    constructor{main-task, @options = {=}} =
       @main-task = meta-task{main-task}
       @options = defaults & @options
+      @options.show = default-show & [@options.show or {=}]
       @last-effects = new Set{}
+      @file-contents = {=}
 
    run{} =
       @state = State{FileSystem{@options}, commit-policy = null}
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
-      @reac = Function{@state, @main-task, {clobber-patch = false}}
+      @reac = Function{@state, @main-task} with {
+         listeners = {
+            effect{match eff} =
+               #write{path, contents} ->
+                  match @file-contents[path]:
+                     undefined? ->
+                        if @options.show.write:
+                           @options.log??{EngageMessage{.add-file, path}}
+                     === contents ->
+                        return
+                     else ->
+                        if @options.show.write:
+                           @options.log??{EngageMessage{.change-file, path}}
+                  filendir.write-file-sync{path, contents}
+                  @file-contents[path] = contents
+            start-compute{f, s, args} =
+               if f.engage-name !== TOP and @options.show.task:
+                  @options.log??{EngageMessage{.begin, f.engage-name, args}}
+            end-compute{f, s, args, time} =
+               if f.engage-name !== TOP and @options.show.task:
+                  @options.log??{EngageMessage{.end, f.engage-name, args, time}}
+            begin-cache{f, s, args} =
+               if f.engage-name !== TOP and @options.show.task and @options.show.cache:
+                  @options.log??{EngageMessage{.begin-cache, f.engage-name, args}}
+            end-cache{f, s, args} =
+               if f.engage-name !== TOP and @options.show.task and @options.show.cache:
+                  @options.log??{EngageMessage{.end-cache, f.engage-name, args}}
+            read-file{path} =
+               if @options.show.read:
+                  @options.log??{EngageMessage{.read-file, path}}
+         }
+         clobber-patch = false
+      }
       @reac.on{.error, e -> @err{e}}
       @reac.sync{-> @act{}}
       @reac.sync-effects{e -> @effects{e}}
@@ -68,16 +114,19 @@ class Engage:
       v = await @reac.get{} ;; ???
       commit-all{v, @options}
 
-   async effects{new-effects} =
-      new-effects each effect ->
-         if not @last-effects.has{effect}:
-            @options.log{EngageMessage{.add-file, effect}}
-      if @options.clean:
-         @last-effects each effect ->
-            if not new-effects.has{effect}:
-               fs.unlink-sync{effect}
-               @options.log{EngageMessage{.remove-file, effect}}
-      @last-effects = new-effects
+   async effects{new-effects >> [new Set{new-effects}]} =
+      pass
+      ;; ;; print #A{new-effects}
+      ;; ;; print #B{@last-effects}
+      ;; new-effects each effect ->
+      ;;    if not @last-effects.has{effect}:
+      ;;       @options.log{EngageMessage{.add-file, effect}}
+      ;; if @options.clean:
+      ;;    @last-effects each effect ->
+      ;;       if not new-effects.has{effect}:
+      ;;          fs.unlink-sync{effect}
+      ;;          @options.log{EngageMessage{.remove-file, effect}}
+      ;; @last-effects = new-effects
 
    async err{e} =
       @options.error{"An error occurred."}
