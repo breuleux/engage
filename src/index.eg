@@ -114,19 +114,16 @@ class Engage:
       v = await @reac.get{} ;; ???
       commit-all{v, @options}
 
-   async effects{new-effects >> [new Set{new-effects}]} =
-      pass
-      ;; ;; print #A{new-effects}
-      ;; ;; print #B{@last-effects}
-      ;; new-effects each effect ->
-      ;;    if not @last-effects.has{effect}:
-      ;;       @options.log{EngageMessage{.add-file, effect}}
-      ;; if @options.clean:
-      ;;    @last-effects each effect ->
-      ;;       if not new-effects.has{effect}:
-      ;;          fs.unlink-sync{effect}
-      ;;          @options.log{EngageMessage{.remove-file, effect}}
-      ;; @last-effects = new-effects
+   async effects{_new-effects} =
+      new-effects = new Set with _new-effects each
+         #write{path, contents} -> path
+         else -> continue
+      if @options.clean:
+         @last-effects each effect ->
+            if not new-effects.has{effect}:
+               fs.unlink-sync{effect}
+               @options.log{EngageMessage{.remove-file, effect}}
+      @last-effects = new-effects
 
    async err{e} =
       @options.error{"An error occurred."}
