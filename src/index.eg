@@ -4,8 +4,8 @@ require:
       cached-function, State, Function
    "./fs" ->
       FileIterator, FileSystem
-   .output ->
-      Write, Delete, commit-all
+   ;; .output ->
+   ;;    Write, Delete, commit-all
    .util ->
       rename, Renamer
       task-function
@@ -22,7 +22,7 @@ provide:
    FileIterator, FileSystem
    Logger, EngageMessage, log, minilog
    rename, Renamer
-   Write, Delete, commit-all
+   ;; Write, Delete, commit-all
    Engage
    task
    each!
@@ -112,7 +112,7 @@ class Engage:
 
    async act{} =
       v = await @reac.get{} ;; ???
-      commit-all{v, @options}
+      ;; commit-all{v, @options}
 
    async effects{_new-effects} =
       new-effects = new Set with _new-effects each
