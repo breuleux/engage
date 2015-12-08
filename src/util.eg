@@ -24,7 +24,7 @@ rename{arg and [var {path => p} or p], opts = {=}} =
          p = path.join{to, rel}
          break
    if opts.extension:
-      p = p.replace{R"\.[a-zA-Z0-9]+$", opts.extension}
+      p = p.replace{R"(\.[a-zA-Z0-9]+)?$", opts.extension}
    match arg:
       String? -> p
       else -> arg.root{}.get{p}
