@@ -6,9 +6,7 @@ var rootPath = "./content";
 var outPath = "./out";
 
 var tMarkdown = engage.task("markdown", function (file) {
-    destination = this.renameOut(file, {extension: ".html"});
-    this.log("Writing file: " + destination.path);
-    destination.write(marked(file.text));
+    this.renameOut(file, {extension: ".html"}).write(marked(file.text));
 });
 
 var tMarkdownAll = engage.task("markdownAll", function (root) {
