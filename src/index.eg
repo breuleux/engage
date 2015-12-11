@@ -32,29 +32,26 @@ debounce{delay}{f} =
 log = Logger{}
 minilog = Logger{false}
 
-defaults = {
-   debounce = 25
-   log = log
-   error = console.error
-}
-
 
 TOP = "{{TOP}}"
 meta-task{main-task} =
    method f{} =
-      this.log{EngageMessage{.begin-engage, main-task}}
+      this.log??{EngageMessage{.begin-engage, main-task}}
       result =
          if @paths.content:
             main-task{@get{@paths.content}}
          else:
             main-task{null}
-      this.log{EngageMessage{.end-engage, main-task}}
+      this.log??{EngageMessage{.end-engage, main-task}}
       result
    f.engage-name = TOP
    cached-function{f}
 
 
 default-options = {
+   debounce = 25
+   log = log
+   error = console.error
    display-full-paths = false
 }
 
@@ -75,6 +72,8 @@ class Engage:
       @main-task = meta-task{main-task}
       @options = default-options & @options
       @options.paths = default-paths & [@options.paths or {=}]
+      @options.show = default-show & [@options.show or {=}]
+      @options.log or= {*} -> pass
       paths = @options.paths
       if not @options.rename-out:
          if paths.content and paths.output:
@@ -91,8 +90,6 @@ class Engage:
                   \ + " Note that you can make custom renamers with"
                   \ + " engage.Renamer({from: fromPath, to: toPath}),"
                   \ + " and you can add them to the options."
-      @options = defaults & @options
-      @options.show = default-show & [@options.show or {=}]
       @last-effects = new Set{}
       @file-contents = {=}
 
@@ -155,7 +152,8 @@ class Engage:
          @last-effects each effect ->
             if not new-effects.has{effect}:
                fs.unlink-sync{effect}
-               @options.log{EngageMessage{.remove-file, @tweak-path{effect}}}
+               if @options.show.write:
+                  @options.log??{EngageMessage{.remove-file, @tweak-path{effect}}}
       @last-effects = new-effects
 
    async err{e} =
