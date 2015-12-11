@@ -6,6 +6,7 @@
     "url": "https://github.com/breuleux/engage"
   },
   "dependencies": {
+    "concat-with-sourcemaps": "^1.0.4",
     "engage": "0.0.9",
     "jade": "^1.11.0",
     "marked": "^0.3.5",

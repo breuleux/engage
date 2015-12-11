@@ -35,7 +35,11 @@ You can also run it from its own directory.
 
 **`mincat`**: minify and concatenate JavaScript source files
 
-**`replace`**: substitute words in text files using a JSON translation dictionary
+**`mincatmap`**: minify and concatenate JavaScript source files, and
+write the source map.
+
+**`replace`**: substitute words in text files using a JSON translation
+dictionary
 
 Try to modify/add/remove files when the example is running. `engage`
 will react to the changes and it will print out everything it reads or
