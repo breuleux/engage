@@ -76,14 +76,18 @@ class EngageMessage:
          .error ->
             {error} = @arguments
             chalk.red{'ERROR: {error.message}'}
+         do:
+            file = match @arguments:
+               {x} -> x
+               else -> "???"
          .read-file ->
-            'R {@arguments[0]}'
+            'R {file}'
          .add-file ->
-            chalk.green{'+ {@arguments[0]}'}
+            chalk.green{'+ {file}'}
          .remove-file ->
-            chalk.red{'- {@arguments[0]}'}
+            chalk.red{'- {file}'}
          .change-file ->
-            chalk.green{'M {@arguments[0]}'}
+            chalk.green{'M {file}'}
          else ->
             '{@type}({@arguments.join{", "}})'
    inspect{} =

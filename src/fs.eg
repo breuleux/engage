@@ -83,11 +83,12 @@ analyze-path{p >> p.split{"/"}} =
 
 class FileSystem:
 
-   constructor{@options} =
+   constructor{@root-path, @options} =
       [@] &: @options
       @directory-cache = {=}
 
-   get{p} =
+   get{_p} =
+      p = if{_p.starts-with{"/"}, _p, path.join{@root-path, _p}}
       match @directory-cache[p]:
          undefined? ->
             entry = FSNode{p}
@@ -383,12 +384,14 @@ register{FileSystem.prototype} with {
 
    serialize{value} =
       {options = value.options
-       directory-cache = value.directory-cache}
+       directory-cache = value.directory-cache
+       root-path = value.root-path}
    create{} =
       Object.create{FileSystem.prototype}
    fill{fs, fields} =
       fs.options = fields.options
       fs.directory-cache = fields.directory-cache
+      fs.root-path = fields.root-path
 
    proxy{deprox! value, tracks, patch} =
       FileSystemProxy{value, tracks, patch}

@@ -44,8 +44,8 @@ meta-task{main-task} =
    method f{} =
       this.log{EngageMessage{.begin-engage, main-task}}
       result =
-         if @root-path:
-            main-task{@get{@root-path}}
+         if @paths.content:
+            main-task{@get{@paths.content}}
          else:
             main-task{null}
       this.log{EngageMessage{.end-engage, main-task}}
@@ -53,6 +53,14 @@ meta-task{main-task} =
    f.engage-name = TOP
    cached-function{f}
 
+
+default-options = {
+   display-full-paths = false
+}
+
+default-paths = {
+   root = "."
+}
 
 default-show = {
    task = true
@@ -65,13 +73,37 @@ class Engage:
 
    constructor{main-task, @options = {=}} =
       @main-task = meta-task{main-task}
+      @options = default-options & @options
+      @options.paths = default-paths & [@options.paths or {=}]
+      paths = @options.paths
+      if not @options.rename-out:
+         if paths.content and paths.output:
+            @options.rename-out = Renamer with {
+               from = path.join{paths.root, paths.content}
+               to = path.join{paths.root, paths.output}
+            }
+         else:
+            @options.rename-out{*} =
+               throw E.no-renamer with
+                  "There is no renameOut."
+                  \ + " Engage will make one for you if you set"
+                  \ + " both paths.content and paths.output in the options."
+                  \ + " Note that you can make custom renamers with"
+                  \ + " engage.Renamer({from: fromPath, to: toPath}),"
+                  \ + " and you can add them to the options."
       @options = defaults & @options
       @options.show = default-show & [@options.show or {=}]
       @last-effects = new Set{}
       @file-contents = {=}
 
+   tweak-path{p} =
+      if @options.display-full-paths:
+         p
+      else:
+         path.relative{process.cwd{}, p}
+
    run{} =
-      @state = State{FileSystem{@options}, commit-policy = null}
+      @state = State{FileSystem{@options.paths.root, @options}, commit-policy = null}
       @state.on{.transact, lodash.debounce{f, @options.debounce}} where f{} =
          @state.commit{}
       @reac = Function{@state, @main-task} with {
@@ -81,12 +113,12 @@ class Engage:
                   match @file-contents[path]:
                      undefined? ->
                         if @options.show.write:
-                           @options.log??{EngageMessage{.add-file, path}}
+                           @options.log??{EngageMessage{.add-file, @tweak-path{path}}}
                      === contents ->
                         return
                      else ->
                         if @options.show.write:
-                           @options.log??{EngageMessage{.change-file, path}}
+                           @options.log??{EngageMessage{.change-file, @tweak-path{path}}}
                   filendir.write-file-sync{path, contents}
                   @file-contents[path] = contents
             start-compute{f, s, args} =
@@ -103,7 +135,7 @@ class Engage:
                   @options.log??{EngageMessage{.end-cache, f.engage-name, args}}
             read-file{path} =
                if @options.show.read:
-                  @options.log??{EngageMessage{.read-file, path}}
+                  @options.log??{EngageMessage{.read-file, @tweak-path{path}}}
          }
          clobber-patch = false
       }
@@ -123,7 +155,7 @@ class Engage:
          @last-effects each effect ->
             if not new-effects.has{effect}:
                fs.unlink-sync{effect}
-               @options.log{EngageMessage{.remove-file, effect}}
+               @options.log{EngageMessage{.remove-file, @tweak-path{effect}}}
       @last-effects = new-effects
 
    async err{e} =
