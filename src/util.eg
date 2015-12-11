@@ -25,6 +25,10 @@ rename{arg and [var {path => p} or p], opts = {=}} =
          break
    if opts.extension:
       p = p.replace{R"(\.[a-zA-Z0-9]+)?$", opts.extension}
+   if opts.dir:
+      p = path.dirname{p}
+   if opts.base:
+      p = path.basename{p}
    match arg:
       String? -> p
       else -> arg.root{}.get{p}
@@ -105,31 +109,40 @@ class _Logger:
       @newline = x.ends-with{"\n"}
    write-line{String! x} =
       @write{x + "\n"}
-   log{match message} =
-      match when @dangling ->
-         do: @dangling = false
-         EngageMessage? {type => .end or .end-cache} ->
-            ;; @write-line{' {chalk.cyan{"end"}}'}
-            @write-line{" " + message.to-string-terse{}}
-            @indent -= 2
+   log{*messages} =
+      pr{i, match message} =
+         do:
+            wr{x} =
+               @write{x}
+            wrl{x} =
+               if i === [messages.length - 1]:
+                  @write-line{x}
+               else:
+                  @write{x + " "}
+         match when @dangling ->
+            do: @dangling = false
+            EngageMessage? {type => .end or .end-cache} ->
+               wrl{" " + message.to-string-terse{}}
+               @indent -= 2
+            else ->
+               @write-line{""}
+               pr{i, message}
+         EngageMessage? {type => match} ->
+            when not @log-tasks ->
+               pass
+            .begin or .begin-cache ->
+               wr{message}
+               @dangling = true
+               @indent += 2
+            .end or .end-cache ->
+               @indent -= 2
+               wrl{message}
+            else ->
+               String! m = message
+               if m !== "": wrl{m}
          else ->
-            @write-line{""}
-            @log{message}
-      EngageMessage? {type => match} ->
-         when not @log-tasks ->
-            pass
-         .begin or .begin-cache ->
-            @write{message}
-            @dangling = true
-            @indent += 2
-         .end or .end-cache ->
-            @indent -= 2
-            @write-line{message}
-         else ->
-            String! m = message
-            if m !== "": @write-line{m}
-      else ->
-         @write-line{message}
+            wrl{message}
+      enumerate{messages} each {i, m} -> pr{i, m}
 
 Logger{*args} =
    l = _Logger{*args}
