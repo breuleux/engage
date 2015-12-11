@@ -14,6 +14,7 @@ require:
       task-function
    path
    fs
+   fs-extra
    chokidar
    minimatch
    filendir
@@ -190,6 +191,14 @@ class FSNode:
    get-files{} =
       if @_files === null:
          @_files = Object.create{null}
+         match @type:
+            null? ->
+               fs-extra.mkdirp-sync{@path}
+               @type = .directory
+            .file ->
+               throw E.not-directory{'"{@path}" is not a directory'}
+            else ->
+               pass
          match @[DIRECTORY]:
             undefined? ->
                fs.readdir-sync{@path} each filename ->
@@ -228,7 +237,7 @@ class FSNode:
       @get-files{}
       match key.split{"/"}:
          {file} ->
-            @_files[file]
+            @_files[file] or FSNode{path.join{@path, file}}
          {base, *rest} ->
             @get{base}.get{rest.join{"/"}}
 
