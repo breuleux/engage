@@ -55,6 +55,10 @@ class EngageMessage:
             '{chalk.cyan{"end"}} {chalk.grey{if{Number? time, String{time} + "ms", ""}}}'
    to-string{} =
       match @type:
+         .begin-engage ->
+            ""
+         .end-engage ->
+            "----------"
          .begin or .end or .begin-cache or .end-cache ->
             {task-name, _, time = ""} = @arguments
             xs = {
@@ -118,7 +122,8 @@ class _Logger:
             @indent -= 2
             @write-line{message}
          else ->
-            @write-line{message}
+            String! m = message
+            if m !== "": @write-line{m}
       else ->
          @write-line{message}
 

@@ -45,10 +45,14 @@ defaults = {
 TOP = "{{TOP}}"
 meta-task{main-task} =
    method f{} =
-      if @root-path:
-         main-task{@get{@root-path}}
-      else:
-         main-task{null}
+      this.log{EngageMessage{.begin-engage, main-task}}
+      result =
+         if @root-path:
+            main-task{@get{@root-path}}
+         else:
+            main-task{null}
+      this.log{EngageMessage{.end-engage, main-task}}
+      result
    f.engage-name = TOP
    cached-function{f}
 
