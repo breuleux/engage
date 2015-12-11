@@ -1,4 +1,5 @@
 
+var path = require("path");
 var engage = require("engage");
 
 var tConfig = engage.task("config", function () {
@@ -20,8 +21,9 @@ var tMain = engage.task("main", function () {
     files.forEach(function (f) { tReplace(f, cfg); });
 });
 
-var rootPath = "./content";
-var outPath = "./out";
+var examplePath = path.relative(process.cwd(), __dirname);
+var rootPath = path.join(examplePath, "content");
+var outPath = path.join(examplePath, "out");
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),

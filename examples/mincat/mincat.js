@@ -1,4 +1,5 @@
 
+var path = require("path");
 var engage = require("engage");
 var minify = require("uglify-js").minify;
 
@@ -19,8 +20,9 @@ var tCat = engage.task("cat", function(root) {
     this.log("Wrote " + dest.path + " (" + result.length + "B)");
 });
 
-var rootPath = "./content";
-var outPath = "./out";
+var examplePath = path.relative(process.cwd(), __dirname);
+var rootPath = path.join(examplePath, "content");
+var outPath = path.join(examplePath, "out");
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),

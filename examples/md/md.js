@@ -1,4 +1,5 @@
 
+var path = require("path");
 var engage = require("engage");
 var marked = require("marked");
 var jade = require("jade");
@@ -21,8 +22,9 @@ var tMarkdownAll = engage.task("markdownAll", function (root) {
     root.find("**/*.md").forEach(tMarkdown);
 });
 
-var rootPath = "./content";
-var outPath = "./out";
+var examplePath = path.relative(process.cwd(), __dirname);
+var rootPath = path.join(examplePath, "content");
+var outPath = path.join(examplePath, "out");
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),

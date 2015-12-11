@@ -16,9 +16,15 @@ same `package.json`).
 
 Each example is organized the same way:
 
-* A JavaScript file which you run with `node example.js`
-* A `contents/` directory with the sources to compile
-* When the example is run, the output will be in the `out/` directory
+* `example/example.js` is the build script
+* `example/contents/` contains the sources to compile
+* `example/out/` will contain the build output
+
+To run an example:
+
+    node example/example.js
+
+You can also run it from its own directory.
 
 ## Summary of examples
 

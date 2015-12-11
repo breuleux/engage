@@ -1,4 +1,5 @@
 
+var path = require("path");
 var engage = require("engage");
 
 var tRead = engage.task("read", function (file) {
@@ -16,8 +17,9 @@ var tMain = engage.task("main", function (root) {
     root.forEach(tCat);
 });
 
-var rootPath = "./content";
-var outPath = "./out";
+var examplePath = path.relative(process.cwd(), __dirname);
+var rootPath = path.join(examplePath, "content");
+var outPath = path.join(examplePath, "out");
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
