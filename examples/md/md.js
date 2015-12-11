@@ -1,5 +1,4 @@
 
-var path = require("path");
 var engage = require("engage");
 var marked = require("marked");
 var jade = require("jade");
