@@ -14,10 +14,9 @@ require:
       task-function
    path
    fs
-   fs-extra
    chokidar
    minimatch
-   filendir
+   mkdirp
 
 provide:
    FileIterator
@@ -193,7 +192,7 @@ class FSNode:
          @_files = Object.create{null}
          match @type:
             null? ->
-               fs-extra.mkdirp-sync{@path}
+               mkdirp.sync{@path}
                @type = .directory
             .file ->
                throw E.not-directory{'"{@path}" is not a directory'}
