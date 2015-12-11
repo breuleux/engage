@@ -205,8 +205,6 @@ manipulations.
 The following methods and properties are available:
 
 
-### **General***
-
 ### `type`
 
 May be `"file"`, `"directory"` or `null`.
@@ -226,7 +224,7 @@ Returns whether this node was last modified less recently than the one
 passed as an argument.
 
 
-### **Available on files***
+### **Available on files**
 
 ### `contents`
 
@@ -245,7 +243,7 @@ Contents of the file as a `Buffer` instance.
 Write contents to the file (String or Buffer).
 
 
-### **Available on directories***
+### **Available on directories**
 
 ### `get(filename)`
 
