@@ -1,12 +1,23 @@
 
 var engage = require("../../lib");
 var marked = require("marked");
+var jade = require("jade");
 
 var rootPath = "./content";
 var outPath = "./out";
 
+var tTemplate = engage.task("template", function () {
+    var file = this.get(this.rootPath).get(this.templateFile);
+    return jade.compile(file.text, {});
+});
+
 var tMarkdown = engage.task("markdown", function (file) {
-    this.renameOut(file, {extension: ".html"}).write(marked(file.text));
+    var template = tTemplate();
+    var result = template({
+        title: file.path,
+        body: marked(file.text)
+    });
+    this.renameOut(file, {extension: ".html"}).write(result);
 });
 
 var tMarkdownAll = engage.task("markdownAll", function (root) {
@@ -17,6 +28,7 @@ opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
     outPath: outPath,
+    templateFile: "template.jade",
     clean: true
 };
 
