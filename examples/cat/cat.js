@@ -1,8 +1,5 @@
 
-var engage = require("../../lib");
-
-var rootPath = "./content";
-var outPath = "./out";
+var engage = require("engage");
 
 var tRead = engage.task("read", function (file) {
     return file.text;
@@ -18,6 +15,9 @@ var tCat = engage.task("cat", function(root) {
 var tMain = engage.task("main", function (root) {
     root.forEach(tCat);
 });
+
+var rootPath = "./content";
+var outPath = "./out";
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),

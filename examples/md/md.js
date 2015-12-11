@@ -1,10 +1,7 @@
 
-var engage = require("../../lib");
+var engage = require("engage");
 var marked = require("marked");
 var jade = require("jade");
-
-var rootPath = "./content";
-var outPath = "./out";
 
 var tTemplate = engage.task("template", function () {
     var file = this.get(this.rootPath).get(this.templateFile);
@@ -23,6 +20,9 @@ var tMarkdown = engage.task("markdown", function (file) {
 var tMarkdownAll = engage.task("markdownAll", function (root) {
     root.find("**/*.md").forEach(tMarkdown);
 });
+
+var rootPath = "./content";
+var outPath = "./out";
 
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),

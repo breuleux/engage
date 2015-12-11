@@ -1,9 +1,6 @@
 
-var engage = require("../../lib");
+var engage = require("engage");
 var minify = require("uglify-js").minify;
-
-var rootPath = "./content";
-var outPath = "./out";
 
 var tMinify = engage.task("minify", function (file) {
     var contents = file.text;
@@ -22,6 +19,9 @@ var tCat = engage.task("cat", function(root) {
     this.log("Wrote " + dest.path + " (" + result.length + "B)");
 });
 
+var rootPath = "./content";
+var outPath = "./out";
+
 opts = {
     renameOut: engage.Renamer({from: rootPath, to: outPath}),
     rootPath: rootPath,
@@ -33,35 +33,3 @@ opts = {
 };
 
 engage(tCat, opts).run();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// var engage = require("../../lib");
-// var minify = require("uglify-js").minify;
-
-// var tMinify = engage.task("minify", function (file) {
-//     return minify(file.text, {fromString: true}).code;
-// });
-
-// var tCat = engage.task("cat", function(root) {
-//     var result = root.find("**/*.js").map(tMinify).join(";");
-//     this.renameOut(root, {extension: ".js"}).write(result);
-// });
-
-// engage(tCat, {rootPath: "./content", outPath: "./out"}).run();
