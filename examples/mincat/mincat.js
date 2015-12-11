@@ -20,14 +20,12 @@ var tCat = engage.task("cat", function(root) {
     this.log("Wrote " + dest.path + " (" + result.length + "B)");
 });
 
-var examplePath = path.relative(process.cwd(), __dirname);
-var rootPath = path.join(examplePath, "content");
-var outPath = path.join(examplePath, "out");
-
 opts = {
-    renameOut: engage.Renamer({from: rootPath, to: outPath}),
-    rootPath: rootPath,
-    outPath: outPath,
+    paths: {
+        root: __dirname,
+        content: "content",
+        output: "out"
+    },
     show: {
         read: false,
         write: false

@@ -3,7 +3,7 @@ var path = require("path");
 var engage = require("engage");
 
 var tConfig = engage.task("config", function () {
-    var cfgfile = this.get(this.rootPath).get("replacements.json");
+    var cfgfile = this.get(this.paths.content).get("replacements.json");
     return JSON.parse(cfgfile.text);
 });
 
@@ -15,20 +15,19 @@ var tReplace = engage.task("replace", function (file, repl) {
     this.renameOut(file).write(result);
 });
 
-var tMain = engage.task("main", function () {
+var tMain = engage.task("main", function (root) {
     var cfg = tConfig();
-    var files = this.get(this.rootPath).find("**/*.txt");
+    var files = root.find("**/*.txt");
     files.forEach(function (f) { tReplace(f, cfg); });
 });
 
-var examplePath = path.relative(process.cwd(), __dirname);
-var rootPath = path.join(examplePath, "content");
-var outPath = path.join(examplePath, "out");
-
 opts = {
-    renameOut: engage.Renamer({from: rootPath, to: outPath}),
-    rootPath: rootPath,
-    outPath: outPath
+    paths: {
+        root: __dirname,
+        content: "content",
+        output: "out"
+    },
+    clean: true
 };
 
 engage(tMain, opts).run();

@@ -4,13 +4,14 @@
 
 This directory contains several runnable examples to showcase `engage`.
 
-To run them, you must `git clone` the `engage` repository
-(alternatively, if you already run `npm install engage`, you can find
-the examples in `node_modules/engage`).
+Try this:
 
-Prior to running the examples, you must run `npm install` in this
-directory or in the directory for the example (all examples share the
-same `package.json`).
+    git clone https://github.com/breuleux/engage.git
+    cd engage/examples
+    npm install
+    node mincat/mincat.js
+    ...
+
 
 ## Organization
 

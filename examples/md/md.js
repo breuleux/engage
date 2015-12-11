@@ -5,7 +5,7 @@ var marked = require("marked");
 var jade = require("jade");
 
 var tTemplate = engage.task("template", function () {
-    var file = this.get(this.rootPath).get(this.templateFile);
+    var file = this.get(this.paths.content).get(this.templateFile);
     return jade.compile(file.text, {});
 });
 
@@ -22,15 +22,13 @@ var tMarkdownAll = engage.task("markdownAll", function (root) {
     root.find("**/*.md").forEach(tMarkdown);
 });
 
-var examplePath = path.relative(process.cwd(), __dirname);
-var rootPath = path.join(examplePath, "content");
-var outPath = path.join(examplePath, "out");
-
 opts = {
-    renameOut: engage.Renamer({from: rootPath, to: outPath}),
-    rootPath: rootPath,
-    outPath: outPath,
     templateFile: "template.jade",
+    paths: {
+        root: __dirname,
+        content: "content",
+        output: "out"
+    },
     clean: true
 };
 
