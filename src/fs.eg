@@ -8,8 +8,6 @@ require:
       side-effect
       emit
       register
-   .output ->
-      read-from, Write
    .util ->
       task-function
    path
@@ -25,19 +23,19 @@ provide:
 
 
 
-extract-text-transformer{f} =
-   method new-f{file, options} =
-      state = current-context{}??.state
-      if not state:
-         throw E.map-file{"Cannot find a renaming function to use."}
-      res = f.call{@, file.text, file}
-      match res:
-         Write? w -> w
-         String? s ->
-            Write{state.self{}.rename{file.path, options}, s}
-         other ->
-            other
-   new-f
+;; extract-text-transformer{f} =
+;;    method new-f{file, options} =
+;;       state = current-context{}??.state
+;;       if not state:
+;;          throw E.map-file{"Cannot find a renaming function to use."}
+;;       res = f.call{@, file.text, file}
+;;       match res:
+;;          Write? w -> w
+;;          String? s ->
+;;             Write{state.self{}.rename{file.path, options}, s}
+;;          other ->
+;;             other
+;;    new-f
 
 class FileIterator:
    constructor{@gen} =
@@ -174,7 +172,6 @@ class FSNode:
    read{} =
       if @type === .file:
          @mtime
-         read-from[@path] = true
          emit{.read-file, @path}
          fs.read-file-sync{@path}
       else:
