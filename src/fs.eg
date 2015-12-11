@@ -209,15 +209,32 @@ class FSNode:
       else:
          @_files
 
-   find{glob} =
+   find{*globs} =
+      pos = globs each glob when not glob.starts-with{"!"} -> glob
+      neg = globs each glob when glob.starts-with{"!"} -> glob[1..]
+      seen = new Set{}
+      FileIterator{g{}} where gen g{} =
+         pos each glob ->
+            @_find{glob} each file ->
+               rel = path.relative{@path, file.path}
+               var br = false
+               neg each r when minimatch{rel, r} ->
+                  br = true
+                  break
+               if br: break
+               if not seen.has{file.path}:
+                  yield file
+                  seen.add{file.path}
+
+   _find{glob} =
       gen g{} =
          match glob.split{"/"}:
             {""} ->
                yield [@]
             {"**", *rest} ->
-               yield all @find{rest.join{"/"}}
+               yield all @_find{rest.join{"/"}}
                [@] each entry when entry.type === .directory ->
-                  yield all entry.find{glob}
+                  yield all entry._find{glob}
             {minimatch.make-re! x, *rest} ->
                @keys{} each
                   x? name ->
@@ -225,10 +242,11 @@ class FSNode:
                      if rest == {}:
                         yield entry
                      elif entry.type === "directory":
-                        yield all entry.find{rest.join{"/"}}
+                        yield all entry._find{rest.join{"/"}}
                   else ->
                      continue
-      FileIterator{g{}}
+      ;; FileIterator{g{}}
+      g{}
 
    get{key} =
       @get-files{}
@@ -291,16 +309,16 @@ class FSNodeProxy < FSNode:
    root{} =
       @[symbols.obj]??[DIRECTORY]??[symbols.associated-state]??.get{}
 
-   find{glob} =
+   _find{glob} =
       gen g{} =
          match glob.split{"/"}:
             {""} ->
                yield [@]
             {"**", *rest} ->
-               yield all @find{rest.join{"/"}}
+               yield all @_find{rest.join{"/"}}
                @[symbols.register-tracks]{"//directories"}
                [@[symbols.obj]] each entry when entry.type === .directory ->
-                  yield all @_prox{entry}.find{glob}
+                  yield all @_prox{entry}._find{glob}
 
             {orig and minimatch.make-re! x, *rest} ->
                @[symbols.register-tracks]{'//:{orig}'}
@@ -311,7 +329,7 @@ class FSNodeProxy < FSNode:
                      if rest == {}:
                         yield entry
                      elif entry.type === "directory":
-                        yield all entry.find{rest.join{"/"}}
+                        yield all entry._find{rest.join{"/"}}
                   else ->
                      continue
       FileIterator{g{}}
