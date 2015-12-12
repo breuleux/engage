@@ -23,46 +23,6 @@ provide:
    FSNode
 
 
-;; class ContentCache:
-;;    constructor{} =
-;;       @reads = {=}
-;;    _read{p} =
-;;       stat = fs.lstat-sync{p}
-;;       mtime = stat.mtime.value-of{}
-;;       match @reads[p] as m:
-;;          undefined? ->
-;;             contents =
-;;                try:
-;;                   emit{.read-file, p}
-;;                   fs.read-file-sync{p}
-;;                catch e: return e
-;;             expr-value @reads[p] = {mtime, contents}
-;;          {old-mtime < mtime, old-contents} ->
-;;             new-contents =
-;;                try:
-;;                   emit{.read-file, p}
-;;                   fs.read-file-sync{p}
-;;                catch e: return e
-;;             if new-contents.equals{old-contents}:
-;;                {old-mtime, old-contents}
-;;             else:
-;;                expr-value @reads[p] = {mtime, new-contents}
-;;          {orig-mtime, orig-contents} ->
-;;             {orig-mtime, orig-contents}
-;;    read{p} =
-;;       match @_read{p}:
-;;          {m, x} -> x
-;;          Error? e -> throw e
-;;    mtime{p} =
-;;       match @_read{p}:
-;;          {x, _} -> x
-;;          Error? e -> throw e
-;;    has-changed{p, since >> since.value-of{}} =
-;;       ;; print {p, @_read{p}??[0], since, @_read{p}??[0] - since}
-;;       match @_read{p}:
-;;          {> since, _} -> true
-;;          else -> false
-
 class ContentCache:
    constructor{} =
       @reads = {=}
@@ -104,27 +64,11 @@ class ContentCache:
          {x, _, _} -> x
          Error? e -> throw e
    has-changed{p, since >> since.value-of{}} =
-      ;; print {p, @_read{p}??[0], since, @_read{p}??[0] - since}
       match @_read{p}:
          {> since, _, _} -> true
          else -> false
 
 content-cache = ContentCache{}
-
-
-;; extract-text-transformer{f} =
-;;    method new-f{file, options} =
-;;       state = current-context{}??.state
-;;       if not state:
-;;          throw E.map-file{"Cannot find a renaming function to use."}
-;;       res = f.call{@, file.text, file}
-;;       match res:
-;;          Write? w -> w
-;;          String? s ->
-;;             Write{state.self{}.rename{file.path, options}, s}
-;;          other ->
-;;             other
-;;    new-f
 
 class FileIterator:
    constructor{@gen} =
