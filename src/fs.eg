@@ -2,7 +2,7 @@
 require:
    quasar ->
       ID, DIRECTORY, symbols
-      setup-proxy, deprox, proxy
+      setup-proxy, deprox, proxy, reprox
       current-frame
       current-context
       side-effect
@@ -10,6 +10,7 @@ require:
       register
    .util ->
       task-function
+      rename as _rename
    path
    fs
    chokidar
@@ -21,6 +22,94 @@ provide:
    FileSystem
    FSNode
 
+
+;; class ContentCache:
+;;    constructor{} =
+;;       @reads = {=}
+;;    _read{p} =
+;;       stat = fs.lstat-sync{p}
+;;       mtime = stat.mtime.value-of{}
+;;       match @reads[p] as m:
+;;          undefined? ->
+;;             contents =
+;;                try:
+;;                   emit{.read-file, p}
+;;                   fs.read-file-sync{p}
+;;                catch e: return e
+;;             expr-value @reads[p] = {mtime, contents}
+;;          {old-mtime < mtime, old-contents} ->
+;;             new-contents =
+;;                try:
+;;                   emit{.read-file, p}
+;;                   fs.read-file-sync{p}
+;;                catch e: return e
+;;             if new-contents.equals{old-contents}:
+;;                {old-mtime, old-contents}
+;;             else:
+;;                expr-value @reads[p] = {mtime, new-contents}
+;;          {orig-mtime, orig-contents} ->
+;;             {orig-mtime, orig-contents}
+;;    read{p} =
+;;       match @_read{p}:
+;;          {m, x} -> x
+;;          Error? e -> throw e
+;;    mtime{p} =
+;;       match @_read{p}:
+;;          {x, _} -> x
+;;          Error? e -> throw e
+;;    has-changed{p, since >> since.value-of{}} =
+;;       ;; print {p, @_read{p}??[0], since, @_read{p}??[0] - since}
+;;       match @_read{p}:
+;;          {> since, _} -> true
+;;          else -> false
+
+class ContentCache:
+   constructor{} =
+      @reads = {=}
+   _read{p} =
+      stat = fs.lstat-sync{p}
+      mtime = stat.mtime.value-of{}
+      match @reads[p]:
+         undefined? ->
+            contents =
+               try:
+                  ;; emit{.read-file, p}
+                  fs.read-file-sync{p}
+               catch e: return e
+            expr-value @reads[p] = {mtime, contents, false}
+         {old-mtime < mtime, old-contents, emitted} ->
+            new-contents =
+               try:
+                  ;; emit{.read-file, p}
+                  fs.read-file-sync{p}
+               catch e: return e
+            if new-contents.equals{old-contents}:
+               {old-mtime, old-contents, emitted}
+            else:
+               expr-value @reads[p] = {mtime, new-contents, false}
+         {orig-mtime, orig-contents, emitted} ->
+            {orig-mtime, orig-contents, emitted}
+   read{p} =
+      match @_read{p}:
+         {m, x, match} ->
+            true? ->
+               x
+            false? ->
+               @reads[p] = {m, x, true}
+               emit{.read-file, p}
+               x
+         Error? e -> throw e
+   mtime{p} =
+      match @_read{p}:
+         {x, _, _} -> x
+         Error? e -> throw e
+   has-changed{p, since >> since.value-of{}} =
+      ;; print {p, @_read{p}??[0], since, @_read{p}??[0] - since}
+      match @_read{p}:
+         {> since, _, _} -> true
+         else -> false
+
+content-cache = ContentCache{}
 
 
 ;; extract-text-transformer{f} =
@@ -163,6 +252,37 @@ class FSNode:
    root{} =
       @[DIRECTORY]??[symbols.associated-state]??.get{}
 
+   base-directory{} =
+      model = proxy{@root{}, @[symbols.tracks], @[symbols.patch]}
+      model.get{path.dirname{@path}}
+
+   rename{options} =
+      if options.to:
+         options.from = @path
+      _rename{@, options}
+
+   copy{x} =
+      dest = match x:
+         FSNode? -> x
+         else -> @rename{x}
+      match @type:
+         .file -> dest.write{@contents}
+         .directory ->
+            @find{"**/*"} each file ->
+               file.copy{dest.get{path.relative{@path, file.path}}}
+      @
+
+   ensure-directory{} =
+      match @type:
+         null? ->
+            mkdirp.sync{@path}
+            @type = .directory
+         .file ->
+            throw E.not-directory{'"{@path}" is not a directory'}
+         else ->
+            pass
+      @
+
    ;; touch{} =
    ;;    @mtime = Date{}
 
@@ -173,8 +293,9 @@ class FSNode:
    read{} =
       if @type === .file:
          @mtime
-         emit{.read-file, @path}
-         fs.read-file-sync{@path}
+         content-cache.read{@path}
+         ;; emit
+         ;; fs.read-file-sync{@path}
       else:
          throw E.engage.read{'read: {@path} is not a file'}
 
@@ -299,8 +420,10 @@ class FSNodeProxy < FSNode:
       proxy{x, @[symbols.tracks], @[symbols.patch]}
 
    touch{} =
-      @[symbols.register-patch]{"//mtime"} with
-         #update{new Date{}}
+      if not @root{}.options.ignore-empty-changes
+         \ or content-cache.has-changed{@path, @[symbols.obj].mtime}:
+         @[symbols.register-patch]{"//mtime"} with
+            #update{content-cache.mtime{@path}}
 
    touch-directory{} =
       @[symbols.register-patch]{"//directories"} with
@@ -424,18 +547,19 @@ register{FSNode.prototype} with {
       {"//type" => value.type
        "//path" => value.path
        "//fs" => value.fs
-       "//mtime" => value.mtime
+       "//mtime" => value.mtime.value-of{}
        "//has-files" => Boolean{value._files}} &:
          object with items{value._files or {=}}
    create{} =
       Object.create{FSNode.prototype}
    fill{fsn, fields} =
       fsn._files = {=}
+      fsn._contents = null
       items{fields} each {match k, v} ->
          "//type" -> fsn.type = v
          "//path" -> fsn.path = v
          "//fs" -> fsn.fs = v
-         "//mtime" -> fsn.mtime = v
+         "//mtime" -> fsn.mtime = new Date{v}
          "//has-files" -> fsn._files = if{v, {=}, null}
          R"^//"? -> pass
          else -> fsn._files[k] = v
