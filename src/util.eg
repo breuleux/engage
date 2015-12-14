@@ -153,48 +153,34 @@ Logger{*args} =
 ;; TASK CACHE ;;
 ;;;;;;;;;;;;;;;;
 
-task-cache = {=}
-
 task-function{*match} =
    {String? name, fn} ->
-      _task-function{fn, null, name}
+      cached-function{fn, name}
    {fn} ->
-      _task-function{fn, null, ""}
+      cached-function{fn, ""}
 
-_task-function{f, transform = null, name = ""} =
-   ;; eager-async f2{*args} =
-   ;;    ;; this.log{EngageMessage{"begin", name, args}}
-   ;;    ;; start-time = new Date{}.value-of{}
-   ;;    try:
-   ;;       result = await f.apply{this, args}
-   ;;    catch e:
-   ;;       ;; if not e._engage-logged:
-   ;;       ;;    this.log{EngageMessage{.error, e}}
-   ;;       ;;    e._engage-logged = true
-   ;;       throw e
-   ;;    finally:
-   ;;       ;; end-time = new Date{}.value-of{}
-   ;;       ;; this.log{EngageMessage{"end", name, args, end-time - start-time}}
-   ;;       result
+;; task-cache = {=}
 
-   ;;       ;; try:
-   ;;       ;;    await f.apply{this, args}
-   ;;       ;; catch e:
-   ;;       ;;    e
-   ;; f2.engage-name = name
-   f2 = f
-   f.engage-name = name
-   m = [task-cache[f.to-string{}] or= new Map{}]
-   match m.get{transform}:
-      undefined? and match is transform ->
-         null? ->
-            c = cached-function{f2}
-            m.set{transform, c}
-            c
-         else ->
-            c = cached-function{transform{f2}}
-            m.set{transform, c}
-            c
-      task-f ->
-         task-f
+;; task-function{*match} =
+;;    {String? name, fn} ->
+;;       _task-function{fn, null, name}
+;;    {fn} ->
+;;       _task-function{fn, null, ""}
+
+;; _task-function{f, transform = null, name = ""} =
+;;    f2 = f
+;;    f.engage-name = name
+;;    m = [task-cache[f.to-string{}] or= new Map{}]
+;;    match m.get{transform}:
+;;       undefined? and match is transform ->
+;;          null? ->
+;;             c = cached-function{f2}
+;;             m.set{transform, c}
+;;             c
+;;          else ->
+;;             c = cached-function{transform{f2}}
+;;             m.set{transform, c}
+;;             c
+;;       task-f ->
+;;          task-f
 
