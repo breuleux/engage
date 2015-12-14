@@ -210,7 +210,8 @@ class FSNode:
          FSNode? -> x
          else -> @rename{x}
       match @type:
-         .file -> dest.write{@contents}
+         .file or null? ->
+            dest.write{@contents}
          .directory ->
             @find{"**/*"} each file ->
                file.copy{dest.get{path.relative{@path, file.path}}}
@@ -514,6 +515,8 @@ register{FSNode.prototype} with {
    enter{@, dir} =
       s = dir[symbols.associated-state]
       prox = s.model{@}
+      if not dir[symbols.associated-state]??.get{}.options.watch:
+         return
       @_watching = true
       @_watcher = chokidar.watch{@path, depth = 0, ignore-initial = true}.on{.all} with
          {match event, fp and p >> path.relative{@path, p}} ->

@@ -53,6 +53,7 @@ default-options = {
    log = log
    error = console.error
    display-full-paths = false
+   watch = true
 }
 
 default-paths = {
