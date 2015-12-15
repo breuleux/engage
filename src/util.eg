@@ -54,26 +54,25 @@ class EngageMessage:
       pass
    to-string-terse{} =
       match @type:
-         .end or .end-cache ->
+         .end-task or .end-cache ->
             {task-name, _, time = ""} = @arguments
             '{chalk.cyan{"end"}} {chalk.grey{if{Number? time, String{time} + "ms", ""}}}'
    to-string{} =
       match @type:
-         .begin-engage ->
+         .begin or .end or .message ->
+            @arguments[0]
+         .engage-on ->
             ""
-         .end-engage ->
+         .engage-off ->
             "----------"
-         .begin or .end or .begin-cache or .end-cache ->
+         .begin-task or .end-task or .begin-cache or .end-cache ->
             {task-name, _, time = ""} = @arguments
             xs = {
-               chalk.cyan{@type.replace{"C", " c"}}
+               chalk.cyan{@type.replace{"C", " c"}.replace{"Task", ""}}
                chalk.yellow{task-name}
                chalk.grey{if{Number? time, String{time} + "ms", ""}}
             }
             [xs each x when x -> x].join{" "}
-         ;; .begin-cache or .end-cache ->
-         ;;    {name} = @arguments
-         ;;    '{chalk.cyan{"use cache"}} {chalk.yellow{name}}'
          .effect ->
             {name} = @arguments
             chalk.green{'Writing {name}'}
@@ -97,52 +96,99 @@ class EngageMessage:
    inspect{} =
       @to-string{}
 
-class _Logger:
-   constructor{@log-tasks = true} =
-      @indent = 0
+
+class BasicLogger:
+
+   constructor{@indent} =
       @newline = true
-      @dangling = false
-   write{String! x} =
+      @parent = null
+
+   write{x} =
       if @newline:
          process.stdout.write{[0 .. @indent each i -> ""].join{" "}}
       process.stdout.write{x}
       @newline = x.ends-with{"\n"}
-   write-line{String! x} =
+
+   write-line{x} =
       @write{x + "\n"}
+
+
+
+class GroupLogger:
+
+   constructor{@opening, @parent} =
+      @indent = [@parent??.indent or 0] + 2
+      @logger = BasicLogger{@indent}
+      @opened = not @opening
+      @newline = false
+
+   write{x} =
+      if not @opened:
+         @opened = true
+         if String{@opening}:
+            @parent.write-line{@opening}
+      @logger.write{x}
+
+   write-line{x} =
+      @write{x + "\n"}
+
+   end{m} =
+      if not String{m}: return @parent
+      if not @opened:
+         @opened = true
+         if m.to-string-terse:
+            @parent.write-line{@opening + " " + m.to-string-terse{}}
+         else:
+            @parent.write-line{@opening}
+            @parent.write-line{m}
+      else:
+         @parent.write-line{m}
+      @parent
+
+
+class _Logger:
+
+   constructor{} =
+      @init-group{}
+
+   init-group{} =
+      @group = BasicLogger{0}
+
+   start-group{opening} =
+      @group = GroupLogger{opening, @group}
+
+   end-group{closing} =
+      if @group.parent:
+         @group = @group.end{closing}
+
    log{*messages} =
       pr{i, match message} =
+
          do:
             wr{x} =
-               @write{x}
+               @group.write{x}
             wrl{x} =
                if i === [messages.length - 1]:
-                  @write-line{x}
+                  @group.write-line{x}
                else:
-                  @write{x + " "}
-         match when @dangling ->
-            do: @dangling = false
-            EngageMessage? {type => .end or .end-cache} ->
-               wrl{" " + message.to-string-terse{}}
-               @indent -= 2
-            else ->
-               @write-line{""}
-               pr{i, message}
+                  @group.write{x + " "}
+
          EngageMessage? {type => match} ->
-            when not @log-tasks ->
-               pass
-            .begin or .begin-cache ->
-               wr{message}
-               @dangling = true
-               @indent += 2
-            .end or .end-cache ->
-               @indent -= 2
+            R"^begin"? ->
+               @start-group{message}
+            R"^end"? ->
+               @end-group{message}
+            .engage-off ->
+               @init-group{}
                wrl{message}
             else ->
-               String! m = message
-               if m !== "": wrl{m}
+               if String{message} !== "":
+                  wrl{message}
          else ->
             wrl{message}
+
       enumerate{messages} each {i, m} -> pr{i, m}
+
 
 Logger{*args} =
    l = _Logger{*args}
@@ -155,8 +201,10 @@ Logger{*args} =
 
 task-function{*match} =
    {String? name, fn} ->
+      fn.engage-name = name
       cached-function{fn, name}
    {fn} ->
+      fn.engage-name = null
       cached-function{fn, ""}
 
 ;; task-cache = {=}

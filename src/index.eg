@@ -36,13 +36,13 @@ minilog = Logger{false}
 TOP = "{{TOP}}"
 meta-task{main-task} =
    method f{} =
-      this.log??{EngageMessage{.begin-engage, main-task}}
+      this.log??{EngageMessage{.engage-on, main-task}}
       result =
          if @paths.content:
             main-task{@get{@paths.content}}
          else:
             main-task{null}
-      this.log??{EngageMessage{.end-engage, main-task}}
+      this.log??{EngageMessage{.engage-off, main-task}}
       result
    f.engage-name = TOP
    cached-function{f}
@@ -65,6 +65,7 @@ default-show = {
    cache = false
    read = true
    write = true
+   delete = true
 }
 
 class Engage:
@@ -121,10 +122,10 @@ class Engage:
                   @file-contents[path] = contents
             start-compute{f, s, args} =
                if f.engage-name !== TOP and @options.show.task:
-                  @options.log??{EngageMessage{.begin, f.engage-name, args}}
+                  @options.log??{EngageMessage{.begin-task, f.engage-name, args}}
             end-compute{f, s, args, time} =
                if f.engage-name !== TOP and @options.show.task:
-                  @options.log??{EngageMessage{.end, f.engage-name, args, time}}
+                  @options.log??{EngageMessage{.end-task, f.engage-name, args, time}}
             begin-cache{f, s, args} =
                if f.engage-name !== TOP and @options.show.task and @options.show.cache:
                   @options.log??{EngageMessage{.begin-cache, f.engage-name, args}}
@@ -143,7 +144,6 @@ class Engage:
 
    async act{} =
       v = await @reac.get{} ;; ???
-      ;; commit-all{v, @options}
 
    async effects{_new-effects} =
       new-effects = new Set with _new-effects each
@@ -153,7 +153,7 @@ class Engage:
          @last-effects each effect ->
             if not new-effects.has{effect}:
                fs.unlink-sync{effect}
-               if @options.show.write:
+               if @options.show.delete:
                   @options.log??{EngageMessage{.remove-file, @tweak-path{effect}}}
       @last-effects = new-effects
 
