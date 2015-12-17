@@ -119,8 +119,11 @@ class GroupLogger:
    constructor{@opening, @parent} =
       @indent = [@parent??.indent or 0] + 2
       @logger = BasicLogger{@indent}
-      @opened = not @opening
-      @newline = false
+      if @opening??.eager:
+         @opened = true
+         @parent.write-line{@opening}
+      else:
+         @opened = not @opening
 
    write{x} =
       if not @opened:
