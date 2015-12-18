@@ -49,10 +49,11 @@ meta-task{main-task} =
 
 
 default-options = {
-   debounce = 25
-   log = log
    error = console.error
+   debounce = 25
    display-full-paths = false
+   ignore-empty-changes = false
+   log = log
    watch = true
 }
 
