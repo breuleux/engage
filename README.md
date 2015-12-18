@@ -12,14 +12,14 @@ Principles
 * **Incremental**: engage knows what has been done, so it doesn't need
   to do it again. You change one file, it recompiles one file.
 
-* **Fast**: because, see above.
+* **Fast**: because see above.
 
 * **Easy**: engage's API is simple and does not require any novel
   concepts. `engage` lets you *do the naive thing* and get away with
   it.
 
 * **No frivolous plugins**: any function that operates a source to
-  source transform should just be used directly.
+  source transform can just be used directly.
 
 
 
@@ -138,6 +138,14 @@ The error logger. This defaults to `console.error`. This cannot be
 `null`.
 
 
+### `ignoreEmptyChanges`
+
+(default: false)
+
+If true, touching a file without changing its contents will not count
+as a change that triggers recompilation.
+
+
 ### `log`
 
 (Optional)
@@ -186,6 +194,14 @@ automatically. The object fields are all booleans, and they are:
 All values default to `true` unless specified otherwise.
 
 
+### `watch`
+
+(default: true)
+
+If true, `engage` will watch the filesystem for changes. If false, it
+will not, and will terminate as soon as the initial run is finished.
+
+
 
 File/directory objects
 ----------------------
@@ -223,24 +239,40 @@ passed as an argument.
 Returns whether this node was last modified less recently than the one
 passed as an argument.
 
+### `copy(dest)`
+
+Copy to the destination. The destination must be a string, another
+`FSNode` or a renaming object. For example:
+
+    node.copy("/some/path")
+    node.copy(root.get("/some/path"))
+    node.copy({to: "/some/path"})
+    node.copy({extension: ".html"})
+
+`copy` can copy files or whole directories.
+
 
 ### **Available on files**
-
-### `contents`
-
-Contents of the file as a `Buffer` instance.
-
-### `text`
-
-Text contents of the file as a string.
 
 ### `read()`
 
 Contents of the file as a `Buffer` instance.
 
+### `readText()`
+
+Text contents of the file as a string.
+
 ### `write(contents)`
 
 Write contents to the file (String or Buffer).
+
+### `contents`
+
+Contents of the file as a `Buffer` instance. Equivalent to `read()`.
+
+### `text`
+
+Text contents of the file as a string. Equivalent to `readText()`.
 
 
 ### **Available on directories**
@@ -308,13 +340,17 @@ In order for a task to work properly there are a few rules to follow:
   * It is fine to do mutation on data which you know is 100% local
     to the task. Just don't let any other task see it.
 
-* **Do not nest tasks.** I mean... technically, you can... but you
-  will run into strange issues if you don't know the finer points of
-  how engage works. For now, I simply recommend not doing it at
-  all. Define every task in module or global scope.
+* **Do not nest tasks.** Engage controls `this` and the arguments to a
+  task, but not free variables, so you may run into issues if you
+  manipulate them, or if the parent scope does (you should be fine if
+  they are constant). I recommend not doing it at all. Define every
+  task in module or global scope.
 
-* Arguments to a task should be engage file/directory handles or small
-  data (strings, integers, small objects). Not arbitrary objects.
+* Arguments to a task should be FSNode objects (`engage`'s
+  file/directory handles) or small data (strings, integers, small
+  objects). They are serialized to form a cache key, which is only
+  supported for specific types (and it is probably unwise to do it for
+  very large objects).
 
 
 
@@ -354,7 +390,7 @@ require:
    engage, uglify-js -> minify
 
 require-macros:
-   engage -> task
+   "engage" -> task
 
 task t-minify(file) =
    minify(file.text, {from-string = true}).code
