@@ -208,6 +208,7 @@ class FSNode:
    copy{x} =
       dest = match x:
          FSNode? -> x
+         String? -> @rename{to = x}
          else -> @rename{x}
       match @type:
          .file or null? ->
@@ -243,6 +244,9 @@ class FSNode:
          ;; fs.read-file-sync{@path}
       else:
          throw E.engage.read{'read: {@path} is not a file'}
+
+   read-text{p} =
+      @read{p}.to-string{}
 
    write{contents} =
       side-effect{#write{@path, contents}}
