@@ -3,7 +3,7 @@ engage
 ======
 
 Incremental build tool with automatic dependency tracking. Very alpha,
-so expect bugs (and expect me to fix them).
+so expect bugs.
 
 
 Principles
@@ -60,31 +60,27 @@ opts = {
 engage(tCat, opts).run();
 ```
 
-See how short that is? But it gives you a lot:
+That is not a lot of code. Now let's see what it does for you:
 
 * **Incremental**: `engage.task` track all reads and all file changes
-  so that work can be minimized:
-  * Modify a `.js` file and only that file will be minified again.
-  * Add a `.js` file and it will be compiled and packed along.
-  * Adding, moving and deleting files and directories will work as
-    expected.
+  so that work can be minimized. For example, if you modify a `.js`
+  file, only that file will be minified again, and if you add a new
+  file, it will be compiled and packed along.
 
 * There is no `engage-minify` package. There is no need for one. The
   `uglify-js` package already exports a `minify` function that maps a
   source string to minified source. That is all you need!
-  * Now you can take this code and adapt it to **any** source to
-    source compiler! No need to wait for someone else to do it for
-    you!
+  * The code can therefore be adapted to *any* source to source
+    compiler. There is no need to wait for someone to write a plugin.
 
-* Deriving the output file from the source file is made easy with
-  `this.renameOut`.
-  * The renamer is automatically derived from `paths.content` and
-    `paths.output`.
+* `this.renameOut` is automatically derived from `paths.content` and
+    `paths.output` and will substitute the latter for the former.
 
 * The `paths.content` option determines what the main task (`tCat` in
-  the example) receives in its `content` argument. Note that this is
-  equivalent to `content = this.get(this.paths.content)`. You can use
-  `this.get` to open any file on the filesystem, if needed.
+  the example) receives in its `content` argument.
+  * This is equivalent to `content =
+    this.get(this.paths.content)`. You can use `this.get` to open any
+    file on the filesystem, if needed.
   * `this.get` is always relative to `paths.root`. Using `__dirname`
     is a good idea there because it makes the task relative to the
     script's location.
