@@ -164,6 +164,9 @@ class _Logger:
       if @group.parent:
          @group = @group.end{closing}
 
+   write{x} =
+      @group.write{x}
+
    log{*messages} =
       pr{i, match message} =
 
