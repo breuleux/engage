@@ -121,7 +121,10 @@ class FileSystem:
       @directory-cache = {=}
 
    get{_p} =
-      p = if{_p.starts-with{"/"}, _p, path.join{@root-path, _p}}
+      @get-from{_p, @root-path}
+
+   get-from{_p, cwd} =
+      p = if{_p.starts-with{"/"}, _p, path.join{cwd, _p}}
       match @directory-cache[p]:
          undefined? ->
             entry = FSNode{p}
@@ -143,11 +146,12 @@ class FileSystemProxy < FileSystem:
 
    constructor{obj, tracks, patch} =
       [@] &: obj.options
+      @root-path = obj.root-path
       setup-proxy{@, obj, tracks, patch}
 
-   get{key} =
+   get-from{key, cwd} =
       @[symbols.register-tracks]{key}
-      proxy{@[symbols.obj].get{key}
+      proxy{@[symbols.obj].get-from{key, cwd}
             @[symbols.tracks]
             @[symbols.patch]}
 
