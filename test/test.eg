@@ -1,0 +1,14 @@
+
+require-macros:
+   earl-mocha ->
+      describe, it, before, after
+      xdescribe, xit
+      assert, asserts
+
+require:
+   ..src as engage
+
+describe "yeah, I know":
+   xit "I should write tests":
+      "No need to tell me."
+
