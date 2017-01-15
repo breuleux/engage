@@ -34,14 +34,15 @@ minilog = Logger{false}
 
 TOP = "{{TOP}}"
 meta-task{main-task} =
-   method f{} =
-      this.log??{EngageMessage{.engage-on, main-task}}
+   async f{} =
+      [@] = this
+      @log??{EngageMessage{.engage-on, main-task}}
       result =
          if @paths.content:
-            main-task{@get{@paths.content}}
+            await main-task{@get{@paths.content}}
          else:
-            main-task{null}
-      this.log??{EngageMessage{.engage-off, main-task}}
+            await main-task{null}
+      @log??{EngageMessage{.engage-off, main-task}}
       result
    f.engage-name = TOP
    cached-function{f}
