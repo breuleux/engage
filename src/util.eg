@@ -1,7 +1,7 @@
 
 require:
    path
-   quasar ->
+   quasimodo ->
       cached-function
    chalk
 

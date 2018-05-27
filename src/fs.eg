@@ -1,6 +1,6 @@
 
 require:
-   quasar ->
+   quasimodo ->
       ID, DIRECTORY, symbols
       setup-proxy, deprox, proxy, reprox
       current-frame

@@ -1,6 +1,6 @@
 
 require:
-   quasar ->
+   quasimodo ->
       cached-function, State, Function
    "./fs" ->
       FileIterator, FileSystem
